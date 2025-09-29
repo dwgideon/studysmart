@@ -1,0 +1,91 @@
+.wrap {
+  display: flex;
+  justify-content: center;
+  padding: 48px 16px;
+}
+
+.panel {
+  width: 100%;
+  max-width: 460px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 16px 36px rgba(0,0,0,.08);
+  padding: 24px;
+}
+
+.title {
+  margin: 0 0 6px 0;
+  color: #141625;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.sub {
+  margin: 0 0 16px 0;
+  color: #6b7280;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+
+.tab {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.active {
+  border-color: #4361ee;
+  color: #4361ee;
+  box-shadow: 0 0 0 4px rgba(67,97,238,.12);
+}
+
+.form {
+  display: grid;
+  gap: 10px;
+}
+
+.form label {
+  font-size: 14px;
+  color: #374151;
+}
+
+.form input {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.form input:focus {
+  border-color: #4361ee;
+  box-shadow: 0 0 0 4px rgba(67,97,238,.12);
+}
+
+.cta {
+  background: #4361ee;
+  color: #fff;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+.footerRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.link {
+  color: #4361ee;
+  text-decoration: none;
+}

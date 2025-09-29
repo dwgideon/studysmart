@@ -1,0 +1,43 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  userId    String
+}
+
+model Flashcard {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  createdAt DateTime @default(now())
+  userId    String
+}
+
+model Quiz {
+  id        String   @id @default(cuid())
+  title     String
+  createdAt DateTime @default(now())
+  userId    String
+  questions QuizQuestion[]
+}
+
+model QuizQuestion {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  options   Json     // ✅ multiple choice stored as JSON
+  quizId    String
+  quiz      Quiz     @relation(fields: [quizId], references: [id])
+}
