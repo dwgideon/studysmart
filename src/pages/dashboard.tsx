@@ -1,192 +1,89 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getMonthlyUsage } from "@/lib/usage"; // we'll create this helper next
 import styles from "@/styles/Dashboard.module.css";
-import Link from "next/link";
 
-export interface Note {
-  id: string;
-  title: string;
-  content: string;
-  createdAt: string;
-  userId: string;
-}
-
-export interface Flashcard {
-  id: string;
-  question: string;
-  answer: string;
-  createdAt: string;
-  userId: string;
-}
-
-export interface QuizQuestion {
-  id: string;
-  question: string;
-  answer: string;
-  options: string[];
-}
-
-export interface Quiz {
-  id: string;
-  title: string;
-  createdAt: string;
-  userId: string;
-  questions: QuizQuestion[];
-}
-
-export default function DashboardPage() {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
-  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+export default function Dashboard() {
+  const [user, setUser] = useState<any>(null);
+  const [usage, setUsage] = useState<number>(0);
+  const [limit, setLimit] = useState<number>(100000); // tokens per month
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadData() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+    const fetchUserAndUsage = async () => {
+      setLoading(true);
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData?.user) return;
 
-      if (!user) {
-        setUserId(null);
-        setLoading(false);
-        return;
-      }
+      setUser(userData.user);
 
-      setUserId(user.id);
+      const usageData = await getMonthlyUsage(userData.user.id);
+      setUsage(usageData.tokensUsed || 0);
 
-      try {
-        const [notesRes, flashcardsRes, quizzesRes] = await Promise.all([
-          fetch(`/api/getNotes?userId=${user.id}`),
-          fetch(`/api/getFlashcards?userId=${user.id}`),
-          fetch(`/api/getQuizzes?userId=${user.id}`),
-        ]);
+      setLoading(false);
+    };
 
-        if (notesRes.ok) setNotes(await notesRes.json());
-        if (flashcardsRes.ok) setFlashcards(await flashcardsRes.json());
-
-        if (quizzesRes.ok) {
-          const quizData: Quiz[] = await quizzesRes.json();
-          const parsed = quizData.map((q) => ({
-            ...q,
-            questions: q.questions.map((qq) => ({
-              ...qq,
-              options:
-                typeof qq.options === "string"
-                  ? JSON.parse(qq.options)
-                  : qq.options,
-            })),
-          }));
-          setQuizzes(parsed);
-        }
-      } catch (err) {
-        console.error("Error loading dashboard data:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadData();
+    fetchUserAndUsage();
   }, []);
 
-  if (loading) return <p className={styles.empty}>Loading...</p>;
-
-  if (!userId) {
-    return (
-      <main className={styles.page}>
-        <h1>Dashboard</h1>
-        <p>
-          Please <a href="/login">log in</a> to access your saved study
-          progress.
-        </p>
-      </main>
-    );
-  }
+  const percentUsed = Math.min((usage / limit) * 100, 100);
 
   return (
-    <main className={styles.page}>
-      <h1>Your Dashboard</h1>
-  {/* Quick Actions */}
-  <div className={styles.quickActions}>
-    <Link href="/" className={styles.quickButton}>
-      📂 Upload New File
-    </Link>
-    <Link href="/quiz" className={styles.quickButton}>
-      📝 Start New Quiz
-    </Link>
-    <Link href="/flashcards" className={styles.quickButton}>
-      🎴 Practice Flashcards
-    </Link>
-    <Link href="/games" className={styles.quickButton}>
-      🎮 Play Study Games
-    </Link>
-  </div>
+    <div className={styles.dashboardContainer}>
+      <header className={styles.header}>
+        <h1>Welcome back, {user?.email || "Student"} 👋</h1>
+        <p>Let’s keep learning smarter — not harder.</p>
+      </header>
 
-      {/* Notes */}
-      <section className={styles.section}>
-        <h2>Notes</h2>
-        {notes.length === 0 ? (
-          <p className={styles.empty}>No saved notes yet.</p>
-        ) : (
-          notes.map((note) => (
-            <div key={note.id} className={styles.card}>
-              <h3>{note.title}</h3>
-              <p>{note.content}</p>
-              <small>
-                Saved on {new Date(note.createdAt).toLocaleDateString()}
-              </small>
+      {loading ? (
+        <div className={styles.loading}>Loading your data...</div>
+      ) : (
+        <>
+          <section className={styles.usageSection}>
+            <h2>Monthly AI Usage</h2>
+            <div className={styles.usageBar}>
+              <div
+                className={styles.usageFill}
+                style={{
+                  width: `${percentUsed}%`,
+                  background:
+                    percentUsed > 80
+                      ? "linear-gradient(90deg, #ff6b6b, #ff8787)"
+                      : "linear-gradient(90deg, #4facfe, #00f2fe)",
+                }}
+              />
             </div>
-          ))
-        )}
-      </section>
+            <p>
+              {usage.toLocaleString()} / {limit.toLocaleString()} tokens used
+            </p>
+          </section>
 
-      {/* Flashcards */}
-      <section className={styles.section}>
-        <h2>Flashcards</h2>
-        {flashcards.length === 0 ? (
-          <p className={styles.empty}>No saved flashcards yet.</p>
-        ) : (
-          flashcards.map((fc) => (
-            <div key={fc.id} className={styles.card}>
-              <p>
-                <strong>Q:</strong> {fc.question}
-              </p>
-              <p>
-                <strong>A:</strong> {fc.answer}
-              </p>
+          <section className={styles.actionsSection}>
+            <h2>Quick Actions</h2>
+            <div className={styles.actionGrid}>
+              <button
+                onClick={() => (window.location.href = "/index")}
+                className={styles.actionCard}
+              >
+                📘 Upload Study Material
+              </button>
+              <button
+                onClick={() => (window.location.href = "/flashcards")}
+                className={styles.actionCard}
+              >
+                🎴 View Flashcards
+              </button>
+              <button
+                onClick={() => (window.location.href = "/quizzes")}
+                className={styles.actionCard}
+              >
+                🧠 Take a Quiz
+              </button>
             </div>
-          ))
-        )}
-      </section>
-
-      {/* Quizzes */}
-      <section className={styles.section}>
-        <h2>Quizzes</h2>
-        {quizzes.length === 0 ? (
-          <p className={styles.empty}>No saved quizzes yet.</p>
-        ) : (
-          quizzes.map((quiz) => (
-            <div key={quiz.id} className={styles.card}>
-              <h3>{quiz.title}</h3>
-              {quiz.questions.map((q) => (
-                <div key={q.id} style={{ marginBottom: "0.75rem" }}>
-                  <p>
-                    <strong>{q.question}</strong>
-                  </p>
-                  <ul className={styles.quizOptions}>
-                    {q.options.map((opt, idx) => (
-                      <li key={idx}>{opt}</li>
-                    ))}
-                  </ul>
-                  <em>Answer: {q.answer}</em>
-                </div>
-              ))}
-            </div>
-          ))
-        )}
-      </section>
-    </main>
+          </section>
+        </>
+      )}
+    </div>
   );
 }

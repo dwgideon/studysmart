@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",
+    "@reactour/tour": "^3.8.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/auth-helpers-react": "^0.5.0",
     "@supabase/auth-ui-react": "^0.4.7",
@@ -20,6 +21,7 @@
     "lucide-react": "^0.515.0",
     "mammoth": "^1.11.0",
     "next": "15.3.2",
+    "next-auth": "^4.24.11",
     "openai": "^4.104.0",
     "pdf-parse": "^1.1.1",
     "pdfjs-dist": "^3.11.174",
@@ -35,6 +37,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@types/next-auth": "^3.13.0",
     "@types/node": "^20.19.11",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",

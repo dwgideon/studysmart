@@ -1,110 +1,79 @@
+// src/pages/api/upload.ts
 import { NextApiRequest, NextApiResponse } from "next";
-import formidable, { IncomingForm, File as FormidableFile } from "formidable";
-import fs from "fs";
-import pdfParse from "pdf-parse";
-import mammoth from "mammoth";
-import * as XLSX from "xlsx";
-import Tesseract from "tesseract.js";
-import unzipper from "unzipper";
+import formidable, { File } from "formidable";
+import fs from "fs/promises";
+import { generateFlashcardsFromText, generateQuizFromText } from "@/lib/aiHelpers";
+import { prisma } from "@/lib/prisma";
 
-// Disable Next.js body parser so formidable can handle file streams
 export const config = {
   api: {
     bodyParser: false,
   },
 };
 
-// Extract text based on file type
-async function extractText(filePath: string, mimeType: string): Promise<string> {
-  // PDF
-  if (mimeType.includes("pdf") || filePath.endsWith(".pdf")) {
-    const buffer = fs.readFileSync(filePath);
-    const data = await pdfParse(buffer);
-    return data.text;
-  }
-
-  // Word
-  if (mimeType.includes("word") || filePath.endsWith(".docx")) {
-    const buffer = fs.readFileSync(filePath);
-    const result = await mammoth.extractRawText({ buffer });
-    return result.value;
-  }
-
-  // Excel
-  if (mimeType.includes("spreadsheet") || filePath.endsWith(".xlsx")) {
-    const workbook: XLSX.WorkBook = XLSX.read(fs.readFileSync(filePath), { type: "buffer" });
-    let text = "";
-    workbook.SheetNames.forEach((sheetName: string) => {
-      const sheet = workbook.Sheets[sheetName];
-      text += XLSX.utils.sheet_to_csv(sheet);
-    });
-    return text;
-  }
-
-  // PowerPoint
-  if (mimeType.includes("presentation") || filePath.endsWith(".pptx")) {
-    const slides: string[] = [];
-    const directory = await unzipper.Open.file(filePath);
-    for (const entry of directory.files) {
-      if (entry.path.startsWith("ppt/slides/") && entry.path.endsWith(".xml")) {
-        const content = await entry.buffer();
-        const text = content.toString("utf-8").replace(/<[^>]+>/g, " ");
-        slides.push(text);
-      }
-    }
-    return slides.join("\n");
-  }
-
-  // Images (OCR)
-  if (mimeType.startsWith("image/")) {
-    const { data } = await Tesseract.recognize(filePath, "eng");
-    return data.text;
-  }
-
-  return "❌ Unsupported file type.";
-}
+// fallback types for formidable
+type FormidableFields = Record<string, any>;
+type FormidableFiles = Record<string, File | File[]>;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  if (req.method !== "POST") return res.status(405).end();
 
-  try {
-    const form = new IncomingForm({ multiples: false });
+  const form = formidable({ multiples: false });
 
-    form.parse(req, async (err: unknown, fields: formidable.Fields, files: formidable.Files) => {
-      if (err) {
-        console.error("Form parse error:", err);
-        return res.status(500).json({ error: "Error parsing file upload" });
+  form.parse(req, async (err: Error | null, fields: FormidableFields, files: FormidableFiles) => {
+    if (err) return res.status(500).json({ error: "File parse failed" });
+
+    try {
+      const file = Array.isArray(files.file) ? files.file[0] : (files.file as File);
+      const topic = (fields.topic as string) || "Untitled";
+      const type = (fields.type as string) || "notes";
+
+      let extractedText = "";
+
+      if (file) {
+        const filePath = (file as any).filepath; // TS safe cast
+        const buffer = await fs.readFile(filePath);
+        extractedText = buffer.toString("utf8").slice(0, 5000);
+      } else if (topic) {
+        extractedText = topic;
       }
 
-      try {
-        // Handle uploaded file safely
-        const fileArray = Array.isArray(files.file) ? files.file : [files.file];
-        const uploadedFile = fileArray[0] as FormidableFile;
+      if (!extractedText) return res.status(400).json({ error: "No text provided" });
 
-        if (!uploadedFile || !uploadedFile.filepath) {
-          return res.status(400).json({ error: "No file uploaded" });
-        }
+      if (type === "quiz") {
+        const aiResult = await generateQuizFromText(extractedText);
 
-        const filePath = uploadedFile.filepath;
-        const mimeType = uploadedFile.mimetype || "";
+        const savedQuiz = await prisma.quiz.create({
+          data: {
+            title: topic,
+            questions: {
+              create: aiResult.map((q: any) => ({
+                question: q.question,
+                answer: q.answer,
+                options: JSON.stringify(q.options),
+              })),
+            },
+            userId: "test-user",
+          },
+        });
 
-        const text = await extractText(filePath, mimeType);
+        return res.status(200).json({ type: "quiz", savedQuiz });
+      } else {
+        const aiResult = await generateFlashcardsFromText(extractedText);
 
-        if (!text || text.trim().length === 0) {
-          console.warn("⚠️ Extracted empty text.");
-          return res.status(400).json({ error: "No readable content extracted" });
-        }
+        const savedFlashcards = await prisma.flashcard.create({
+  data: {
+    front: "Question?",
+    back: "Answer",
+    userId: "test-user",
+  },
+});
 
-        return res.status(200).json({ text });
-      } catch (parseError) {
-        console.error("File processing error:", parseError);
-        return res.status(500).json({ error: "Error processing file" });
+        return res.status(200).json({ type: "notes", savedFlashcards });
       }
-    });
-  } catch (outerError) {
-    console.error("Unexpected error:", outerError);
-    return res.status(500).json({ error: "Unexpected server error" });
-  }
+    } catch (error: any) {
+      console.error(error);
+      return res.status(500).json({ error: error.message });
+    }
+  });
 }

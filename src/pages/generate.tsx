@@ -1,18 +1,16 @@
+// pages/generate.tsx
 import { useState } from "react";
 import Layout from "../components/Layout";
-import { postToGroq } from "../utils/groqClient";
-import { useStudyStore } from "../store/useStudyStore";
-import { useRouter } from "next/router";
+import { FlashcardViewer } from "@/components/FlashcardViewer";
 
 export default function Generate() {
   const [topic, setTopic] = useState("");
-  const [mode, setMode] = useState("flashcards");
+  const [mode, setMode] = useState<"flashcards" | "quiz">("flashcards");
   const [detail, setDetail] = useState("overview");
   const [numQuestions, setNumQuestions] = useState(10);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const router = useRouter();
-  const addFile = useStudyStore((state) => state.addFile);
+  const [flashcards, setFlashcards] = useState<{ front: string; back: string }[]>([]);
 
   const handleGenerate = async () => {
     if (!topic) {
@@ -22,26 +20,27 @@ export default function Generate() {
 
     setLoading(true);
     setError("");
+    setFlashcards([]);
 
     const prompt =
       mode === "flashcards"
-        ? `Create ${numQuestions} flashcards for the topic "${topic}" at a ${detail} level. Format as "Q: question?\nA: answer."`
-        : `Create a ${numQuestions}-question multiple-choice quiz on the topic "${topic}" with 4 answer choices and clearly mark the correct answer. Focus on a ${detail} level of depth.`;
+        ? `Create ${numQuestions} flashcards for the topic "${topic}" at a ${detail} level. Format as JSON with "front" and "back".`
+        : `Create ${numQuestions} multiple-choice questions on the topic "${topic}" at a ${detail} level. Format as JSON with "question", "options", and "answer".`;
 
     try {
-      const content = await postToGroq(prompt);
-
-      addFile({
-        name: `AI - ${topic}`,
-        extractedText: content,
-        summary: "",
-        source: "ai",
+      const res = await fetch("/api/generateFlashcards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: prompt }),
       });
 
-      router.push(`/${mode}`);
-    } catch (err) {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Generation failed");
+
+      setFlashcards(data.flashcards);
+    } catch (err: any) {
       console.error(err);
-      setError("Failed to generate content.");
+      setError(err.message || "Failed to generate content.");
     } finally {
       setLoading(false);
     }
@@ -50,9 +49,7 @@ export default function Generate() {
   return (
     <Layout>
       <div style={{ padding: "2rem", maxWidth: "700px", margin: "auto" }}>
-        <h1 style={{ fontSize: "2rem", marginBottom: "1rem" }}>
-          📘 Generate Study Material
-        </h1>
+        <h1 style={{ fontSize: "2rem", marginBottom: "1rem" }}>📘 Generate Study Material</h1>
 
         <input
           type="text"
@@ -76,7 +73,7 @@ export default function Generate() {
               type="radio"
               value="flashcards"
               checked={mode === "flashcards"}
-              onChange={(e) => setMode(e.target.value)}
+              onChange={(e) => setMode(e.target.value as "flashcards" | "quiz")}
             />
             Flashcards
           </label>
@@ -85,7 +82,7 @@ export default function Generate() {
               type="radio"
               value="quiz"
               checked={mode === "quiz"}
-              onChange={(e) => setMode(e.target.value)}
+              onChange={(e) => setMode(e.target.value as "flashcards" | "quiz")}
             />
             Quiz
           </label>
@@ -118,9 +115,9 @@ export default function Generate() {
               borderRadius: "6px",
             }}
           >
-            {[...Array(20)].map((_, i) => (
-              <option key={i} value={(i + 1) * 10}>
-                {(i + 1) * 10}
+            {[5, 10, 15, 20, 25].map((n) => (
+              <option key={n} value={n}>
+                {n}
               </option>
             ))}
           </select>
@@ -145,8 +142,13 @@ export default function Generate() {
         </button>
 
         {error && <p style={{ color: "red", marginTop: "1rem" }}>{error}</p>}
+
+        {flashcards.length > 0 && (
+          <div style={{ marginTop: "2rem" }}>
+            <FlashcardViewer flashcards={flashcards} />
+          </div>
+        )}
       </div>
     </Layout>
   );
 }
-

@@ -1,17 +1,19 @@
-export function parseQuizText(text) {
-  const parts = text.split(/\n(?=Question:|Answer:|A\)|B\)|C\)|D\))/g);
-  let htmlBlocks = [];
-  let current = "";
+// utils/parseQuiz.js or parseFlashcards.ts
+export function parseFlashcardsFromText(text) {
+  const lines = text.split('\n').filter(Boolean);
+  const cards = [];
 
-  for (let line of parts) {
-    if (/^Question:/.test(line)) {
-      if (current) htmlBlocks.push(current);
-      current = `<strong>${line.trim()}</strong>`;
-    } else {
-      current += `<br>${line.trim()}`;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^\d+\./.test(line)) {
+      const question = line.replace(/^\d+\.\s*/, '').trim();
+      const answerLine = lines[i + 1] || '';
+      const answer = answerLine.includes('Answer:')
+        ? answerLine.replace('Answer:', '').trim()
+        : '...';
+      cards.push({ question, answer });
     }
   }
-  if (current) htmlBlocks.push(current);
-  return htmlBlocks;
-}
 
+  return cards;
+}

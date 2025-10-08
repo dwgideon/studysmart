@@ -1,5 +1,4 @@
 // prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,35 +8,85 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id    String  @id @default(cuid())
+  email String  @unique
+  name  String?
+  // other fields...
+
+  flashcards Flashcard[] // 👈 Relation to Flashcard
+  tokenLogs  TokenLog[] // 👈 Add this line!
+  Note       Note[]
+  Quiz       Quiz[]
+  Usage      Usage[]
+  SavedQuiz  SavedQuiz[]
+}
+
 model Note {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   title     String
   content   String
   createdAt DateTime @default(now())
   userId    String
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model Flashcard {
   id        String   @id @default(cuid())
   question  String
   answer    String
-  createdAt DateTime @default(now())
   userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
 }
 
 model Quiz {
-  id        String   @id @default(cuid())
+  id        String         @id @default(uuid())
   title     String
-  createdAt DateTime @default(now())
+  createdAt DateTime       @default(now())
   userId    String
+  user      User           @relation(fields: [userId], references: [id])
   questions QuizQuestion[]
 }
 
 model QuizQuestion {
+  id       String @id @default(uuid())
+  question String
+  answer   String
+  options  String // store as JSON string
+  quizId   String
+  quiz     Quiz   @relation(fields: [quizId], references: [id])
+}
+
+model Usage {
+  id         String   @id @default(uuid())
+  userId     String
+  month      String
+  tokensUsed Int      @default(0)
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, month])
+}
+
+model TokenLog {
+  id         String   @id @default(cuid())
+  userId     String
+  tokensUsed Int
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model SavedQuiz {
   id        String   @id @default(cuid())
-  question  String
-  answer    String
-  options   Json     // ✅ multiple choice stored as JSON
-  quizId    String
-  quiz      Quiz     @relation(fields: [quizId], references: [id])
+  topic     String
+  type      String
+  questions Json
+  answers   Json
+  score     Int
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
 }

@@ -1,34 +1,30 @@
-import type { NextApiRequest, NextApiResponse } from "next";
+// pages/api/saveQuiz.ts
 import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { NextApiRequest, NextApiResponse } from "next";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
 
-  const { title, questions, userId } = req.body;
+  const session = await getServerSession(req, res, authOptions);
+  if (!session?.user?.id) return res.status(401).end();
 
-  if (!userId || !title || !questions?.length) {
-    return res.status(400).json({ error: "Missing quiz data or userId" });
-  }
+  const { topic, type, questions, answers, score } = req.body;
 
   try {
-    const quiz = await prisma.quiz.create({
+    const saved = await prisma.savedQuiz.create({
       data: {
-        title,
-        userId,
-        questions: {
-          create: questions.map(
-            (q: { question: string; answer: string; options: string[] }) => ({
-              question: q.question,
-              answer: q.answer,
-              options: q.options, // ✅ stored as JSON
-            })
-          ),
-        },
+        userId: session.user.id,
+        topic,
+        type,
+        questions,
+        answers,
+        score,
       },
-      include: { questions: true },
     });
 
-    res.status(200).json(quiz);
+    res.status(200).json({ success: true, quizId: saved.id });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to save quiz" });
