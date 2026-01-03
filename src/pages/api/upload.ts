@@ -1,9 +1,9 @@
-// src/pages/api/upload.ts
-import { NextApiRequest, NextApiResponse } from "next";
-import formidable, { File } from "formidable";
-import fs from "fs/promises";
-import { generateFlashcardsFromText, generateQuizFromText } from "@/lib/aiHelpers";
-import { prisma } from "@/lib/prisma";
+import type { NextApiRequest, NextApiResponse } from "next";
+import formidable from "formidable";
+import fs from "fs";
+import pdf from "pdf-parse";
+import mammoth from "mammoth";
+import { openai } from "@/lib/openai";
 
 export const config = {
   api: {
@@ -11,69 +11,75 @@ export const config = {
   },
 };
 
-// fallback types for formidable
-type FormidableFields = Record<string, any>;
-type FormidableFiles = Record<string, File | File[]>;
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const form = new formidable.IncomingForm({ keepExtensions: true });
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).end();
-
-  const form = formidable({ multiples: false });
-
-  form.parse(req, async (err: Error | null, fields: FormidableFields, files: FormidableFiles) => {
-    if (err) return res.status(500).json({ error: "File parse failed" });
+  form.parse(req, async (err: any, _fields: any, files: any) => {
+    if (err) {
+      return res.status(500).json({ error: "File parsing failed." });
+    }
 
     try {
-      const file = Array.isArray(files.file) ? files.file[0] : (files.file as File);
-      const topic = (fields.topic as string) || "Untitled";
-      const type = (fields.type as string) || "notes";
+      const file = files.file?.[0];
+      if (!file) return res.status(400).json({ error: "No file uploaded." });
 
       let extractedText = "";
 
-      if (file) {
-        const filePath = (file as any).filepath; // TS safe cast
-        const buffer = await fs.readFile(filePath);
-        extractedText = buffer.toString("utf8").slice(0, 5000);
-      } else if (topic) {
-        extractedText = topic;
+      // PDF
+      if (file.mimetype === "application/pdf") {
+        const data = fs.readFileSync(file.filepath);
+        const parsed = await pdf(data);
+        extractedText = parsed.text;
       }
 
-      if (!extractedText) return res.status(400).json({ error: "No text provided" });
-
-      if (type === "quiz") {
-        const aiResult = await generateQuizFromText(extractedText);
-
-        const savedQuiz = await prisma.quiz.create({
-          data: {
-            title: topic,
-            questions: {
-              create: aiResult.map((q: any) => ({
-                question: q.question,
-                answer: q.answer,
-                options: JSON.stringify(q.options),
-              })),
-            },
-            userId: "test-user",
-          },
+      // Word doc
+      else if (
+        file.mimetype ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ) {
+        const result = await mammoth.extractRawText({
+          path: file.filepath,
         });
-
-        return res.status(200).json({ type: "quiz", savedQuiz });
-      } else {
-        const aiResult = await generateFlashcardsFromText(extractedText);
-
-        const savedFlashcards = await prisma.flashcard.create({
-  data: {
-    front: "Question?",
-    back: "Answer",
-    userId: "test-user",
-  },
-});
-
-        return res.status(200).json({ type: "notes", savedFlashcards });
+        extractedText = result.value;
       }
-    } catch (error: any) {
-      console.error(error);
-      return res.status(500).json({ error: error.message });
+
+      // Plain text fallback
+      else {
+        extractedText = fs.readFileSync(file.filepath, "utf-8");
+      }
+
+      if (!extractedText || extractedText.length < 50) {
+        return res.status(400).json({ error: "Could not extract readable content." });
+      }
+
+      // Send notes to tutor
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.4,
+        max_tokens: 600,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Summarize the following notes into a clean middle-school-friendly lesson using Markdown formatting and bullet points.",
+          },
+          {
+            role: "user",
+            content: extractedText.substring(0, 12_000),
+          },
+        ],
+      });
+
+      res.status(200).json({
+        lesson: completion.choices[0].message.content,
+      });
+
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "AI lesson generation failed." });
     }
   });
 }

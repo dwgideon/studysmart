@@ -1,8 +1,10 @@
 import React, { createContext, useState } from 'react';
 
+type Material = Record<string, unknown> | null;
+
 type MaterialsContextType = {
-  materials: any; // you can replace `any` with a stricter type if you know your data shape
-  setMaterials: React.Dispatch<React.SetStateAction<any>>;
+  materials: Material;
+  setMaterials: React.Dispatch<React.SetStateAction<Material>>;
 };
 
 export const MaterialsContext = createContext<MaterialsContextType>({
@@ -11,7 +13,7 @@ export const MaterialsContext = createContext<MaterialsContextType>({
 });
 
 export function MaterialsProvider({ children }: { children: React.ReactNode }) {
-  const [materials, setMaterials] = useState<any>(null);
+  const [materials, setMaterials] = useState<Material>(null);
 
   return (
     <MaterialsContext.Provider value={{ materials, setMaterials }}>

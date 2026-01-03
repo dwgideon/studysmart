@@ -1,16 +1,9 @@
 declare module "xlsx" {
-  export interface WorkBook {
+  export function read(data: Buffer, options?: Record<string, unknown>): Workbook;
+  export function utils(): Record<string, unknown>;
+  export type Workbook = {
     SheetNames: string[];
-    Sheets: { [sheet: string]: WorkSheet };
-  }
-
-  export interface WorkSheet {
-    [cell: string]: any;
-  }
-
-  export function read(data: Buffer | Uint8Array, opts?: any): WorkBook;
-
-  export const utils: {
-    sheet_to_csv: (sheet: WorkSheet, opts?: any) => string;
+    Sheets: Record<string, Sheet>;
   };
+  export type Sheet = Record<string, unknown>;
 }

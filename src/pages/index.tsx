@@ -1,13 +1,16 @@
 // src/pages/index.tsx
+
 import { useState } from "react";
 import { useRouter } from "next/router";
+import styles from "@/styles/Landing.module.css";
 
 export default function IndexPage() {
   const [topic, setTopic] = useState("");
-  const [type, setType] = useState("notes"); // "quiz" or "notes"
+  const [type, setType] = useState("notes");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -27,8 +30,8 @@ export default function IndexPage() {
       });
 
       if (!res.ok) throw new Error("Upload failed");
-      await res.json();
 
+      await res.json();
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message);
@@ -38,44 +41,46 @@ export default function IndexPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-lg">
-        <h1 className="text-2xl font-bold mb-6 text-center">
+    <main className={styles.page}>
+      <div className={styles.card}>
+        <h1 className={styles.title}>
           Study Smarter, Not Harder
         </h1>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className={styles.form}>
           <input
             type="text"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             placeholder="Enter a topic"
-            className="w-full border px-3 py-2 rounded-md"
+            className={styles.input}
           />
 
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
-            className="w-full border px-3 py-2 rounded-md"
+            className={styles.select}
           >
-            <option value="notes">Notes</option>
-            <option value="quiz">Quiz</option>
+            <option value="notes">Create Notes</option>
+            <option value="quiz">Create Quiz</option>
           </select>
 
           <input
             type="file"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="w-full border px-3 py-2 rounded-md"
+            onChange={(e) =>
+              setFile(e.target.files ? e.target.files[0] : null)
+            }
+            className={styles.input}
           />
 
-          {error && <p className="text-red-600">{error}</p>}
+          {error && <p className={styles.error}>{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md"
+            className={styles.button}
           >
-            {loading ? "Processing..." : "Generate Study Material"}
+            {loading ? "Processing..." : "Generate"}
           </button>
         </form>
       </div>

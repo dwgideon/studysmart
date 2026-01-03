@@ -1,89 +1,62 @@
-"use client";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import { getMonthlyUsage } from "@/lib/usage"; // we'll create this helper next
-import styles from "@/styles/Dashboard.module.css";
+import Layout from "@/components/Layout";
 
 export default function Dashboard() {
-  const [user, setUser] = useState<any>(null);
-  const [usage, setUsage] = useState<number>(0);
-  const [limit, setLimit] = useState<number>(100000); // tokens per month
+  const [streak, setStreak] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUserAndUsage = async () => {
-      setLoading(true);
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData?.user) return;
+    async function loadStats() {
+      try {
+        const res = await fetch("/api/study/stats");
+        const data: { streak: number } = await res.json();
+        setStreak(data.streak);
+      } catch (err) {
+        console.error("Failed to load stats", err);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-      setUser(userData.user);
-
-      const usageData = await getMonthlyUsage(userData.user.id);
-      setUsage(usageData.tokensUsed || 0);
-
-      setLoading(false);
-    };
-
-    fetchUserAndUsage();
+    loadStats();
   }, []);
 
-  const percentUsed = Math.min((usage / limit) * 100, 100);
-
   return (
-    <div className={styles.dashboardContainer}>
-      <header className={styles.header}>
-        <h1>Welcome back, {user?.email || "Student"} 👋</h1>
-        <p>Let’s keep learning smarter — not harder.</p>
-      </header>
+    <Layout>
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
 
-      {loading ? (
-        <div className={styles.loading}>Loading your data...</div>
-      ) : (
-        <>
-          <section className={styles.usageSection}>
-            <h2>Monthly AI Usage</h2>
-            <div className={styles.usageBar}>
-              <div
-                className={styles.usageFill}
-                style={{
-                  width: `${percentUsed}%`,
-                  background:
-                    percentUsed > 80
-                      ? "linear-gradient(90deg, #ff6b6b, #ff8787)"
-                      : "linear-gradient(90deg, #4facfe, #00f2fe)",
-                }}
-              />
+        {/* STREAK CARD */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white p-6 shadow-lg">
+            <div className="text-sm uppercase tracking-wide opacity-90">
+              Study Streak
             </div>
-            <p>
-              {usage.toLocaleString()} / {limit.toLocaleString()} tokens used
-            </p>
-          </section>
+            <div className="text-4xl font-extrabold mt-2">
+              {loading ? "…" : `🔥 ${streak} day${streak === 1 ? "" : "s"}`}
+            </div>
+          </div>
 
-          <section className={styles.actionsSection}>
-            <h2>Quick Actions</h2>
-            <div className={styles.actionGrid}>
-              <button
-                onClick={() => (window.location.href = "/index")}
-                className={styles.actionCard}
-              >
-                📘 Upload Study Material
-              </button>
-              <button
-                onClick={() => (window.location.href = "/flashcards")}
-                className={styles.actionCard}
-              >
-                🎴 View Flashcards
-              </button>
-              <button
-                onClick={() => (window.location.href = "/quizzes")}
-                className={styles.actionCard}
-              >
-                🧠 Take a Quiz
-              </button>
+          {/* PLACEHOLDERS FOR NEXT FEATURES */}
+          <div className="rounded-xl bg-gray-100 p-6">
+            <div className="text-sm uppercase tracking-wide text-gray-500">
+              XP
             </div>
-          </section>
-        </>
-      )}
-    </div>
+            <div className="text-3xl font-bold mt-2 text-gray-800">
+              Coming Next
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-gray-100 p-6">
+            <div className="text-sm uppercase tracking-wide text-gray-500">
+              Accuracy
+            </div>
+            <div className="text-3xl font-bold mt-2 text-gray-800">
+              Coming Next
+            </div>
+          </div>
+        </div>
+      </div>
+    </Layout>
   );
 }
