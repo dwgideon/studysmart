@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
 
 export default async function handler(
-  req: NextApiRequest,
+  _req: NextApiRequest,
   res: NextApiResponse
 ) {
   // TEMP: replace later with real auth user
