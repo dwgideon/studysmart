@@ -145,8 +145,8 @@ model notes {
 model usage {
   id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId     String
-  month      String   // YYYY-MM
-  tokensUsed Int      @default(0)
+  month      String
+  tokensUsed Int @default(0)
 
   @@unique([userId, month], name: "userId_month")
   @@schema("public")
