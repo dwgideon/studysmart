@@ -9,15 +9,15 @@ type QuizQuestion = {
 };
 
 export default async function handler(
-  req: NextApiRequest,
+  _req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== "POST") {
+  if (_req.method !== "POST") {
     return res.status(405).end();
   }
 
   try {
-    const { questions, userId } = req.body;
+    const { questions, userId } = _req.body;
 
     if (!Array.isArray(questions)) {
       return res.status(400).json({ error: "Missing questions array" });

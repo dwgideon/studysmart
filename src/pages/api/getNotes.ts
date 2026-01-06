@@ -1,19 +1,27 @@
-// src/pages/api/getNotes.ts
-import { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  _req: NextApiRequest,
+  res: NextApiResponse
+) {
   try {
-    const flashcards = await prisma.flashcard.findMany({ take: 5, orderBy: { createdAt: "desc" } });
-    const quizzes = await prisma.quiz.findMany({
+    const flashcards = await prisma.flashcard.findMany({
       take: 5,
-      include: { questions: true },
-      orderBy: { createdAt: "desc" },
+      orderBy: { created_at: "desc" },
     });
-    const notes = await prisma.note.findMany({ take: 5, orderBy: { createdAt: "desc" } });
 
-    res.json({ flashcards, quizzes, notes });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    const notes = await prisma.notes.findMany({
+      take: 5,
+      orderBy: { created_at: "desc" },
+    });
+
+    return res.status(200).json({
+      flashcards,
+      notes,
+    });
+  } catch (error) {
+    console.error("getNotes error:", error);
+    return res.status(500).json({ error: "Failed to fetch notes" });
   }
 }
