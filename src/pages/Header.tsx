@@ -1,12 +1,19 @@
 import { signIn, signOut, useSession } from "next-auth/react";
 
-const { data: session } = useSession();
+export default function Header() {
+  const { data: session } = useSession();
 
-return session ? (
-  <>
-    <p>Welcome, {session.user?.name}!</p>
-    <button onClick={() => signOut()}>Sign Out</button>
-  </>
-) : (
-  <button onClick={() => signIn("google")}>Sign In</button>
-);
+  const handleSignIn = () => {
+    signIn();
+  };
+
+  return (
+    <header>
+      {!session ? (
+        <button onClick={handleSignIn}>Sign in</button>
+      ) : (
+        <button onClick={() => signOut()}>Sign out</button>
+      )}
+    </header>
+  );
+}
