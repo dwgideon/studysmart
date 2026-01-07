@@ -151,3 +151,12 @@ model usage {
   @@unique([userId, month])
   @@schema("public")
 }
+
+model savedQuiz {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String
+  quizData   Json
+  created_at DateTime @default(now())
+
+  @@schema("public")
+}
