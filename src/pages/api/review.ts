@@ -9,7 +9,8 @@ export default async function handler(
     return res.status(405).end();
   }
 
-  const { cardId, sessionId, correct, seconds } = req.body;
+const { cardId, sessionId, correct, seconds: _seconds } = req.body;
+
 
   if (!cardId || !sessionId) {
     return res.status(400).json({ error: "Missing data" });
