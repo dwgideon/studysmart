@@ -1,82 +1,110 @@
-// src/pages/api/processMaterials.js
-import formidable from 'formidable';
-import fs from 'fs';
-import pdfParse from 'pdf-parse';
-import OpenAI from 'openai';
+// src/pages/api/processMaterials.ts
+import type { NextApiRequest, NextApiResponse } from "next";
+import formidable from "formidable";
+import fs from "fs";
+import pdfParse from "pdf-parse";
+import OpenAI from "openai";
 
-export const config = { api: { bodyParser: false } };
+export const config = {
+  api: { bodyParser: false },
+};
 
 const DEPTH_CONFIG = {
   min: { flashcards: 20, quizQuestions: 10, summaryParas: 1, studyBullets: 5, maxTokens: 800 },
   med: { flashcards: 40, quizQuestions: 20, summaryParas: 2, studyBullets: 10, maxTokens: 1500 },
   max: { flashcards: 80, quizQuestions: 40, summaryParas: 4, studyBullets: 20, maxTokens: 2500 },
-};
+} as const;
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow','POST');
-    return res.status(405).end('Method Not Allowed');
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).end("Method Not Allowed");
   }
 
   const form = formidable({ multiples: true });
-  form.parse(req, async (err, fields, files) => {
-    if (err) return res.status(500).json({ error: 'Error parsing form data' });
 
-    const { depth = 'med', topic = '' } = fields;
-    const cfg = DEPTH_CONFIG[depth] || DEPTH_CONFIG.med;
+  form.parse(
+  req,
+  async (
+    err: Error | null,
+    fields: Record<string, any>,
+    files: Record<string, any>
+  ) => {
+    if (err) {
+      console.error("Form parse error:", err);
+      return res.status(500).json({ error: "Failed to parse form data" });
+    }
 
-    // Extract text (PDF/text only for brevity)
-    const textPieces = [];
-    const noteFiles = Array.isArray(files['note-upload'])
-      ? files['note-upload']
-      : files['note-upload'] ? [files['note-upload']] : [];
+    const depth = (fields.depth as string) || "med";
+    const topic = (fields.topic as string) || "";
 
-    for (let nf of noteFiles) {
-      const buf = fs.readFileSync(nf.filepath);
-      if (nf.mimetype === 'application/pdf') {
-        const data = await pdfParse(buf);
-        textPieces.push(data.text);
+    const cfg =
+      DEPTH_CONFIG[depth as keyof typeof DEPTH_CONFIG] ??
+      DEPTH_CONFIG.med;
+
+    const uploads = files["note-upload"];
+    const noteFiles = Array.isArray(uploads)
+      ? uploads
+      : uploads
+      ? [uploads]
+      : [];
+
+    const textPieces: string[] = [];
+
+    for (const file of noteFiles as any[]) {
+      const buffer = fs.readFileSync(file.filepath);
+
+      if (file.mimetype === "application/pdf") {
+        const parsed = await pdfParse(buffer);
+        textPieces.push(parsed.text);
       } else {
-        textPieces.push(buf.toString('utf8'));
+        textPieces.push(buffer.toString("utf8"));
       }
     }
-    const combinedText = textPieces.join('\n\n');
 
-    // Build prompt with explanation request
+    const combinedText = textPieces.join("\n\n");
+
     const prompt = `
-You are an expert study-material generator. The learner provided materials on the topic: "${topic}".
-Generate exactly:
-1) A JSON array "flashcards" with ${cfg.flashcards} items of {question, answer}.
-2) A JSON array "quizQuestions" with ${cfg.quizQuestions} items of {question, choices:[...], answer, explanation}.
-3) A JSON field "summary" with exactly ${cfg.summaryParas} paragraph${cfg.summaryParas>1?'s':''}.
-4) A JSON array "studyGuide" with ${cfg.studyBullets} bullet-point strings.
+You are an expert study-material generator.
 
-Use only the content below. Return valid JSON only.
------  
+Topic: "${topic}"
+
+Return VALID JSON ONLY with:
+1) "flashcards" (${cfg.flashcards})
+2) "quizQuestions" (${cfg.quizQuestions})
+3) "summary" (${cfg.summaryParas} paragraphs)
+4) "studyGuide" (${cfg.studyBullets} bullets)
+
+Content:
 ${combinedText}
------`.trim();
+`.trim();
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+        model: "gpt-3.5-turbo",
         messages: [
-          { role: 'system', content: 'You generate study materials.' },
-          { role: 'user', content: prompt }
+          { role: "system", content: "You generate study materials." },
+          { role: "user", content: prompt },
         ],
         temperature: 0.7,
         max_tokens: cfg.maxTokens,
       });
 
-      const aiText = response.choices[0].message.content;
-      const result = JSON.parse(aiText);
-      return res.status(200).json(result);
-    } catch (e) {
-      console.error('AI generation error:', e);
-      // Fallback omitted for brevity
-      return res.status(500).json({ error: 'AI generation failed', detail: e.message });
+      const json = response.choices[0].message.content ?? "{}";
+      return res.status(200).json(JSON.parse(json));
+    } catch (error: any) {
+      console.error("AI generation error:", error);
+      return res.status(500).json({
+        error: "AI generation failed",
+        detail: error.message,
+      });
     }
   });
 }
-
