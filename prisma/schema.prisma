@@ -157,12 +157,13 @@ model usage {
  * =========================
  */
 model savedQuiz {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id        String   @id @default(uuid())
   userId    String
-  topic     String
+  topic     String        // ✅ MUST BE HERE
   type      String
   questions Json
   answers   Json
+  score     Int?
   createdAt DateTime @default(now())
 
   @@index([userId])
