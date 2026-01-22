@@ -1,16 +1,25 @@
-
 import { useEffect, useState } from "react";
 import { useUser } from "@supabase/auth-helpers-react";
 import { supabase } from "../lib/supabaseClient";
-import withAuth from "../utils/withAuth";
 
-function GamesPage() {
+type Question = {
+  statement: string;
+  answer: boolean;
+};
+
+type LeaderboardEntry = {
+  username: string;
+  score: number;
+  created_at: string;
+};
+
+export default function GamesPage() {
   const user = useUser();
-  const [questions, setQuestions] = useState([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [index, setIndex] = useState(0);
   const [feedback, setFeedback] = useState("");
   const [score, setScore] = useState(0);
-  const [leaderboard, setLeaderboard] = useState([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
 
   // Fetch notes and generate questions
   useEffect(() => {
@@ -20,7 +29,8 @@ function GamesPage() {
         .select("content")
         .eq("user_id", user?.id);
 
-      const text = notes?.map(n => n.content).join("\n\n") || "";
+      const text = notes?.map((n) => n.content).join("\n\n") || "";
+
       const { data: response } = await supabase.functions.invoke("generate_true_false", {
         body: { text },
       });
@@ -33,8 +43,9 @@ function GamesPage() {
     if (user) fetchNotesAndGenerateQuestions();
   }, [user]);
 
-  const handleAnswer = async (value) => {
+  const handleAnswer = async (value: boolean) => {
     const correct = questions[index]?.answer === value;
+
     if (correct) {
       setFeedback("✅ Correct!");
       setScore((s) => s + 1);
@@ -48,29 +59,39 @@ function GamesPage() {
     }, 1000);
   };
 
-  const submitScore = async () => {
-    await supabase.from("leaderboard").insert({
-      user_id: user.id,
-      username: user.user_metadata?.name || "Anonymous",
-      score,
-    });
-    fetchLeaderboard();
-  };
-
   const fetchLeaderboard = async () => {
     const { data } = await supabase
       .from("leaderboard")
       .select("username, score, created_at")
       .order("score", { ascending: false })
       .limit(10);
+
     setLeaderboard(data || []);
+  };
+
+  const submitScore = async () => {
+    if (!user) return;
+
+    await supabase.from("leaderboard").insert({
+      user_id: user.id,
+      username: (user.user_metadata as any)?.name || "Anonymous",
+      score,
+    });
+
+    fetchLeaderboard();
   };
 
   useEffect(() => {
     fetchLeaderboard();
   }, []);
 
-  if (!questions.length) return <div className="p-10 text-center">Generating questions from your notes...</div>;
+  if (!user) {
+    return <div className="p-10 text-center">Please log in to play.</div>;
+  }
+
+  if (!questions.length) {
+    return <div className="p-10 text-center">Generating questions from your notes...</div>;
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-12 text-center">
@@ -81,10 +102,16 @@ function GamesPage() {
       </div>
 
       <div className="flex justify-center gap-6 mb-4">
-        <button onClick={() => handleAnswer(true)} className="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600">
+        <button
+          onClick={() => handleAnswer(true)}
+          className="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600"
+        >
           True
         </button>
-        <button onClick={() => handleAnswer(false)} className="bg-red-500 text-white px-6 py-2 rounded hover:bg-red-600">
+        <button
+          onClick={() => handleAnswer(false)}
+          className="bg-red-500 text-white px-6 py-2 rounded hover:bg-red-600"
+        >
           False
         </button>
       </div>
@@ -92,7 +119,10 @@ function GamesPage() {
       {feedback && <div className="text-lg font-semibold mb-4">{feedback}</div>}
       <div className="text-gray-600 mb-6">Score: {score}</div>
 
-      <button onClick={submitScore} className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">
+      <button
+        onClick={submitScore}
+        className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+      >
         Submit Score
       </button>
 
@@ -109,6 +139,3 @@ function GamesPage() {
     </div>
   );
 }
-
-export default withAuth(GamesPage);
-
