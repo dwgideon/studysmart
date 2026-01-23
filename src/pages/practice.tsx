@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
-import { prisma } from "@/lib/prisma";
+
 
 type Flashcard = {
   id: string;
