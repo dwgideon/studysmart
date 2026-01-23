@@ -3,29 +3,17 @@ import { supabase } from "../lib/supabaseClient";
 
 export default function DebugPage() {
   useEffect(() => {
-    const testInsert = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      const userId = user?.id;
-
-      if (!userId) {
-        console.log("No user logged in");
-        return;
-      }
-
-      const { error } = await supabase.from("notes").insert({
-        user_id: userId,
-        title: "Test note",
-        content: "Hello from debug page",
-      });
-
-      console.log("Insert result:", error ?? "success");
+    const test = async () => {
+      const { data, error } = await supabase.from("notes").select("*").limit(1);
+      console.log("Debug DB:", data, error);
     };
-
-    testInsert();
+    test();
   }, []);
 
-  return <div>Debug Page — check console</div>;
+  return (
+    <div style={{ padding: "2rem" }}>
+      <h1>Debug Page</h1>
+      <p>Check console for Supabase results.</p>
+    </div>
+  );
 }

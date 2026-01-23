@@ -1,6 +1,5 @@
 import { useState } from "react";
 import Layout from "../components/Layout";
-import { postToGroq } from "../utils/groqClient";
 import { useStudyStore } from "../store/useStudyStore";
 
 export default function StudyPlanPage() {
@@ -34,8 +33,16 @@ ${content || "No content provided. Focus on general learning goals for the topic
 `;
 
     try {
-      const aiPlan = await postToGroq(prompt);
-      setPlan(aiPlan);
+      const res = await fetch("/api/ai/study-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "AI error");
+
+      setPlan(data.plan);
     } catch (err) {
       console.error(err);
       setError("Failed to generate study plan.");
@@ -84,7 +91,15 @@ ${content || "No content provided. Focus on general learning goals for the topic
         {error && <p style={{ color: "red", marginTop: "1rem" }}>{error}</p>}
 
         {plan && (
-          <div style={{ marginTop: "2rem", whiteSpace: "pre-wrap", background: "#f9f9f9", padding: "1.5rem", borderRadius: "8px" }}>
+          <div
+            style={{
+              marginTop: "2rem",
+              whiteSpace: "pre-wrap",
+              background: "#f9f9f9",
+              padding: "1.5rem",
+              borderRadius: "8px",
+            }}
+          >
             {plan}
           </div>
         )}
@@ -92,4 +107,3 @@ ${content || "No content provided. Focus on general learning goals for the topic
     </Layout>
   );
 }
-
