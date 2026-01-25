@@ -1,33 +1,33 @@
 {
   "compilerOptions": {
     /* === Core Settings === */
-    "target": "ES2020",                    
+    "target": "ES2020",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": false,
     "skipLibCheck": true,
-    "strict": true,                        
+    "strict": true,
     "forceConsistentCasingInFileNames": true,
-    "noEmit": true,                        
+    "noEmit": true,
 
     /* === Module Resolution === */
     "module": "esnext",
-    "moduleResolution": "node",         
+    "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "esModuleInterop": true,
     "jsx": "preserve",
     "incremental": true,
 
-    /* === Path Aliases (adjust if needed) === */
+    /* === Path Aliases === */
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
     },
 
     /* === Lint / Cleanup Helpers === */
-    "noUnusedLocals": true,                // Warn about unused variables
-    "noUnusedParameters": true,            // Warn about unused function params
-    "verbatimModuleSyntax": false,          // Preserve import syntax (replaces importsNotUsedAsValues)
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": false,
 
     /* === Type Checking Improvements === */
     "strictNullChecks": true,
@@ -47,6 +47,7 @@
     ".next",
     "out",
     "dist",
-    "build"
+    "build",
+    "supabase"
   ]
 }
