@@ -1,31 +1,62 @@
-// src/pages/results.js
-import React, { useContext, useState, useEffect } from 'react';
-import Head from 'next/head';
-import { useRouter } from 'next/router';
-import styles from './Results.module.css';
-import { MaterialsContext } from '../context/MaterialsContext';
+import React, { useContext, useState, useEffect } from "react";
+import Head from "next/head";
+import { useRouter } from "next/router";
+import styles from "./Results.module.css";
+import { MaterialsContext } from "../context/MaterialsContext";
+
+/* ---------- Types ---------- */
+
+type Flashcard = {
+  question: string;
+  answer: string;
+};
+
+type QuizQuestion = {
+  question: string;
+  answer: string;
+  choices: string[];
+  explanation?: string;
+};
+
+type Materials = {
+  flashcards: Flashcard[];
+  quizQuestions: QuizQuestion[];
+  summary: string;
+  studyGuide: string[];
+};
+
+/* ---------- Component ---------- */
 
 export default function Results() {
   const router = useRouter();
-  const { materials } = useContext(MaterialsContext);
-  const [tab, setTab] = useState('flashcards');
 
-  // Flashcard state
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isFlipped, setIsFlipped] = useState(false);
+  const context = useContext(MaterialsContext) as { materials: Materials | null };
+  const materials = context?.materials ?? null;
 
-  // Quiz state
-  const quizQuestions = materials?.quizQuestions || [];
-  const [userAnswers, setUserAnswers] = useState([]);
-  const [finished, setFinished] = useState(false);
-  const [score, setScore] = useState(0);
+  const [tab, setTab] = useState<"flashcards" | "quiz" | "summary" | "guide">(
+    "flashcards"
+  );
 
-  // redirect if no data
+  /* ---------- Flashcards ---------- */
+
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [isFlipped, setIsFlipped] = useState<boolean>(false);
+
+  /* ---------- Quiz ---------- */
+
+  const quizQuestions: QuizQuestion[] = materials?.quizQuestions || [];
+  const [userAnswers, setUserAnswers] = useState<(string | null)[]>([]);
+  const [finished, setFinished] = useState<boolean>(false);
+  const [score, setScore] = useState<number>(0);
+
+  /* ---------- Redirect if no data ---------- */
+
   useEffect(() => {
-    if (!materials) router.replace('/');
+    if (!materials) router.replace("/");
   }, [materials, router]);
 
-  // init quiz answers when materials load
+  /* ---------- Init quiz answers ---------- */
+
   useEffect(() => {
     setUserAnswers(Array(quizQuestions.length).fill(null));
   }, [quizQuestions.length]);
@@ -35,19 +66,24 @@ export default function Results() {
   const flashcards = materials.flashcards || [];
   const totalFlash = flashcards.length;
 
-  // Flashcard flip
+  /* ---------- Flashcard flip ---------- */
+
   const handleFlip = () => {
     if (isFlipped) return;
+
     setIsFlipped(true);
+
     setTimeout(() => {
       setIsFlipped(false);
       setCurrentIndex((i) => (i + 1 < totalFlash ? i + 1 : 0));
     }, 1000);
   };
 
-  // Quiz answer select
-  const handleSelect = (idx, choice) => {
+  /* ---------- Quiz handlers ---------- */
+
+  const handleSelect = (idx: number, choice: string) => {
     if (finished) return;
+
     const copy = [...userAnswers];
     copy[idx] = choice;
     setUserAnswers(copy);
@@ -55,12 +91,16 @@ export default function Results() {
 
   const handleFinish = () => {
     let count = 0;
+
     quizQuestions.forEach((q, i) => {
       if (userAnswers[i] === q.answer) count++;
     });
+
     setScore(count);
     setFinished(true);
   };
+
+  /* ---------- Render ---------- */
 
   return (
     <div className={styles.container}>
@@ -70,42 +110,43 @@ export default function Results() {
 
       <h1 className={styles.title}>Your AI-Generated Study Materials</h1>
 
-      {/* Tabs */}
+      {/* ---------- Tabs ---------- */}
+
       <div className={styles.tabs}>
-        {['flashcards', 'quiz', 'summary', 'guide'].map((t) => (
+        {(["flashcards", "quiz", "summary", "guide"] as const).map((t) => (
           <button
             key={t}
-            className={`${styles.tab} ${tab === t ? styles.activeTab : ''}`}
+            className={`${styles.tab} ${tab === t ? styles.activeTab : ""}`}
             onClick={() => {
               setTab(t);
-              // reset flashcards state
-              if (t === 'flashcards') {
+              if (t === "flashcards") {
                 setCurrentIndex(0);
                 setIsFlipped(false);
               }
             }}
           >
-            {t === 'flashcards'
-              ? 'Flashcards'
-              : t === 'quiz'
-              ? 'Quiz Questions'
-              : t === 'summary'
-              ? 'Summary'
-              : 'Study Guide'}
+            {t === "flashcards"
+              ? "Flashcards"
+              : t === "quiz"
+              ? "Quiz Questions"
+              : t === "summary"
+              ? "Summary"
+              : "Study Guide"}
           </button>
         ))}
       </div>
 
-      {/* Content */}
-      <div className={styles.content}>
+      {/* ---------- Content ---------- */}
 
-        {/* Flashcards */}
-        {tab === 'flashcards' && totalFlash > 0 && (
+      <div className={styles.content}>
+        {/* ---------- Flashcards ---------- */}
+
+        {tab === "flashcards" && totalFlash > 0 && (
           <div className={styles.flashcardWrapper}>
             <div className={styles.flashcard} onClick={handleFlip}>
               <div
                 className={`${styles.cardInner} ${
-                  isFlipped ? styles.isFlipped : ''
+                  isFlipped ? styles.isFlipped : ""
                 }`}
               >
                 <div className={styles.cardFront}>
@@ -116,77 +157,80 @@ export default function Results() {
                 </div>
               </div>
             </div>
+
             <div className={styles.counter}>
               Card {currentIndex + 1} of {totalFlash}
             </div>
           </div>
         )}
 
-        {/* Quiz Questions */}
-{tab === 'quiz' && (
-  <div className={styles.quiz}>
-    {quizQuestions.map((q, i) => {
-      const isCorrect = userAnswers[i] === q.answer;
-      return (
-        <div key={i} className={styles.quizItem}>
-          <p className={styles.quizQ}>{q.question}</p>
-          <ul className={styles.choices}>
-            {q.choices.map((c, j) => {
-              const wrongPick = finished && userAnswers[i] === c && c !== q.answer;
+        {/* ---------- Quiz ---------- */}
+
+        {tab === "quiz" && (
+          <div className={styles.quiz}>
+            {quizQuestions.map((q, i) => {
               return (
-                <li key={j}>
-                  <label
-                    className={`${wrongPick ? styles.incorrect : ''} ${
-                      finished && c === q.answer ? styles.correct : ''
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={`quiz-${i}`}
-                      value={c}
-                      checked={userAnswers[i] === c}
-                      disabled={finished}
-                      onChange={() => handleSelect(i, c)}
-                    />{' '}
-                    {c}
-                  </label>
-                </li>
+                <div key={i} className={styles.quizItem}>
+                  <p className={styles.quizQ}>{q.question}</p>
+
+                  <ul className={styles.choices}>
+                    {q.choices.map((c, j) => {
+                      const wrongPick =
+                        finished && userAnswers[i] === c && c !== q.answer;
+
+                      return (
+                        <li key={j}>
+                          <label
+                            className={`${wrongPick ? styles.incorrect : ""} ${
+                              finished && c === q.answer ? styles.correct : ""
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name={`quiz-${i}`}
+                              value={c}
+                              checked={userAnswers[i] === c}
+                              disabled={finished}
+                              onChange={() => handleSelect(i, c)}
+                            />{" "}
+                            {c}
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  {finished && q.explanation && (
+                    <div className={styles.explanation}>
+                      <strong>Why?</strong> {q.explanation}
+                    </div>
+                  )}
+                </div>
               );
             })}
-          </ul>
 
-          {/* Show explanation after finishing */}
-          {finished && (
-            <div className={styles.explanation}>
-              <strong>Why?</strong> {q.explanation}
-            </div>
-          )}
-        </div>
-      );
-    })}
+            {!finished ? (
+              <button
+                className={styles.finishButton}
+                onClick={handleFinish}
+                disabled={userAnswers.includes(null)}
+              >
+                Finish Quiz
+              </button>
+            ) : (
+              <div className={styles.score}>
+                You scored {score} out of {quizQuestions.length}
+              </div>
+            )}
+          </div>
+        )}
 
-    {!finished ? (
-      <button
-        className={styles.finishButton}
-        onClick={handleFinish}
-        disabled={userAnswers.includes(null)}
-      >
-        Finish Quiz
-      </button>
-    ) : (
-      <div className={styles.score}>
-        You scored {score} out of {quizQuestions.length}
-      </div>
-    )}
-  </div>
-)}
+        {/* ---------- Summary ---------- */}
 
-
-        {/* Summary */}
-        {tab === 'summary' && (
+        {tab === "summary" && (
           <div className={styles.summary}>
             {materials.summary
-              .split('\n')
+              .split("\n")
               .filter((p) => p.trim())
               .map((para, idx) => (
                 <p key={idx}>{para}</p>
@@ -194,17 +238,16 @@ export default function Results() {
           </div>
         )}
 
-        {/* Study Guide */}
-        {tab === 'guide' && (
+        {/* ---------- Study Guide ---------- */}
+
+        {tab === "guide" && (
           <ul className={styles.guide}>
             {materials.studyGuide.map((item, i) => (
               <li key={i}>{item}</li>
             ))}
           </ul>
         )}
-
       </div>
     </div>
   );
 }
-
