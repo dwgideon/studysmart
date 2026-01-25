@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { useRouter } from "next/router";
 
 type QuizQuestion = {
   id: string;
@@ -9,13 +8,11 @@ type QuizQuestion = {
 };
 
 export default function QuizResultsPage() {
-  const router = useRouter();
-
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // ✅ Explicit typing fixes the TS7034 error
-    const incorrect: QuizQuestion[] = []; // replace with real results later
+    // Placeholder until real results are wired in
+    const incorrect: QuizQuestion[] = [];
 
     const topic = "demo";
     const type = "quiz";
