@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import styles from "@/styles/Landing.module.css";
 
+
 export default function IndexPage() {
   const [topic, setTopic] = useState("");
   const [type, setType] = useState("notes");
