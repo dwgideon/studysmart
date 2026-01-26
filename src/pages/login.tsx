@@ -1,10 +1,9 @@
 import dynamic from "next/dynamic";
 import Head from "next/head";
 import Layout from "../components/Layout";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "../lib/supabaseClient";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 
-// ✅ Only Auth is dynamically imported (client-side only)
 const Auth = dynamic(
   () => import("@supabase/auth-ui-react").then((mod) => mod.Auth),
   { ssr: false }
@@ -31,4 +30,9 @@ export default function LoginPage() {
       </div>
     </Layout>
   );
+}
+
+/* ✅ THIS prevents static prerender during build */
+export async function getServerSideProps() {
+  return { props: {} };
 }
