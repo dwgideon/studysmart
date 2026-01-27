@@ -9,9 +9,9 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== "POST") return res.status(405).end();
+  if (req.method !== "GET") return res.status(405).end();
 
-  const userId = "demo-user"; // TEMP
+  const userId = "demo-user"; // TODO: replace with real auth
 
   const cards = await prisma.flashcard.findMany({
     where: { user_id: userId },
