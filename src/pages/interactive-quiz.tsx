@@ -1,123 +1,106 @@
-import { useStudyStore } from "../store/useStudyStore";
-import Layout from "../components/Layout";
 import { useEffect, useState } from "react";
+import AppLayout from "../components/layout/AppLayout";
+import layout from "../styles/layout.module.css";
+import { useStudyStore } from "../store/useStudyStore";
 
-type QuizQuestion = {
-  question: string;
-  options: string[];
-  correct: string | null;
-};
-
-type AnswerReview = QuizQuestion & {
-  selected: string;
-  isCorrect: boolean;
-};
+/* ---------- Component ---------- */
 
 export default function InteractiveQuiz() {
-  const { files } = useStudyStore();
-  const activeFile = files.find((f) => f.active);
+  const store = useStudyStore();
 
-  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  // adjust if store structure changes
+  const quizQuestions = (store as any).quiz || (store as any).quizQuestions || [];
+
   const [current, setCurrent] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
   const [score, setScore] = useState(0);
-  const [answers, setAnswers] = useState<AnswerReview[]>([]);
-  const [showSummary, setShowSummary] = useState(false);
+  const [finished, setFinished] = useState(false);
 
   useEffect(() => {
-    if (!activeFile?.extractedText) return;
+    if (!quizQuestions || quizQuestions.length === 0) {
+      console.warn("No quiz questions found in store.");
+    }
+  }, [quizQuestions]);
 
-    const lines = activeFile.extractedText.split("\n").filter(Boolean);
-    const parsed: QuizQuestion[] = [];
+  const handleNext = () => {
+    if (!selected) return;
 
-    for (let i = 0; i < lines.length; i++) {
-      if (/^\d+\./.test(lines[i])) {
-        const question = lines[i];
-        const options = lines.slice(i + 1, i + 5);
-        const correctLine = options.find((o: string) => o.includes("*"));
-
-        parsed.push({
-          question,
-          options: options.map((o: string) => o.replace("*", "").trim()),
-          correct: correctLine ? correctLine.replace("*", "").trim() : null,
-        });
-      }
+    if (selected === quizQuestions[current].answer) {
+      setScore((s) => s + 1);
     }
 
-    setQuestions(parsed);
-  }, [activeFile]);
-
-  const handleAnswer = (option: string) => {
-    const q = questions[current];
-    const isCorrect = option === q.correct;
-
-    setScore((s) => s + (isCorrect ? 1 : 0));
-    setAnswers((a) => [...a, { ...q, selected: option, isCorrect }]);
-
-    if (current + 1 < questions.length) {
+    if (current + 1 < quizQuestions.length) {
       setCurrent((c) => c + 1);
+      setSelected(null);
     } else {
-      setShowSummary(true);
+      setFinished(true);
     }
   };
 
-  if (!activeFile)
-    return (
-      <Layout>
-        <p>Please select or upload a file.</p>
-      </Layout>
-    );
-
-  if (!questions.length)
-    return (
-      <Layout>
-        <p>No quiz questions found in this file.</p>
-      </Layout>
-    );
-
-  if (showSummary) {
-    return (
-      <Layout>
-        <h2>Quiz Complete</h2>
-        <p>
-          Score: {score} / {questions.length}
-        </p>
-
-        <ul>
-          {answers.map((a, i) => (
-            <li key={i}>
-              <strong>{a.question}</strong>
-              <div>Correct: {a.correct}</div>
-              <div>Your answer: {a.selected}</div>
-            </li>
-          ))}
-        </ul>
-
-        <button
-          onClick={() => {
-            setCurrent(0);
-            setScore(0);
-            setAnswers([]);
-            setShowSummary(false);
-          }}
-        >
-          Retake
-        </button>
-      </Layout>
-    );
-  }
-
-  const q = questions[current];
-
   return (
-    <Layout>
-      <h3>{q.question}</h3>
-      <ul>
-        {q.options.map((opt, i) => (
-          <li key={i}>
-            <button onClick={() => handleAnswer(opt)}>{opt}</button>
-          </li>
-        ))}
-      </ul>
-    </Layout>
+    <AppLayout>
+      <section className={layout.card}>
+        <h1>Interactive Quiz</h1>
+
+        {!quizQuestions || quizQuestions.length === 0 ? (
+          <p>No quiz loaded. Please generate a study session first.</p>
+        ) : finished ? (
+          <div>
+            <h2>Quiz Complete 🎉</h2>
+            <p>
+              You scored {score} out of {quizQuestions.length}
+            </p>
+          </div>
+        ) : (
+          <>
+            <p>
+              Question {current + 1} of {quizQuestions.length}
+            </p>
+
+            <h3 style={{ marginTop: "1rem" }}>
+              {quizQuestions[current].question}
+            </h3>
+
+            <ul style={{ marginTop: "1rem" }}>
+              {quizQuestions[current].options.map(
+                (opt: string, i: number) => (
+                  <li key={i} style={{ marginBottom: "0.5rem" }}>
+                    <label style={{ cursor: "pointer" }}>
+                      <input
+                        type="radio"
+                        name="quiz"
+                        checked={selected === opt}
+                        onChange={() => setSelected(opt)}
+                        style={{ marginRight: "0.5rem" }}
+                      />
+                      {opt}
+                    </label>
+                  </li>
+                )
+              )}
+            </ul>
+
+            <button
+              onClick={handleNext}
+              disabled={!selected}
+              style={{
+                marginTop: "1rem",
+                padding: "0.6rem 1.2rem",
+                borderRadius: 10,
+                border: "none",
+                background: "linear-gradient(135deg, #5b8cff, #7c5cff)",
+                color: "#fff",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {current + 1 === quizQuestions.length
+                ? "Finish Quiz"
+                : "Next Question"}
+            </button>
+          </>
+        )}
+      </section>
+    </AppLayout>
   );
 }
