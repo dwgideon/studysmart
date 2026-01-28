@@ -1,3 +1,4 @@
+import React from "react";
 import layout from "../../styles/layout.module.css";
 
 type Props = {
@@ -6,8 +7,8 @@ type Props = {
 
 export default function AppLayout({ children }: Props) {
   return (
-    <div className={styles.page}>
-      <div className={styles.container}>{children}</div>
+    <div className={layout.page}>
+      <main className={layout.main}>{children}</main>
     </div>
   );
 }
