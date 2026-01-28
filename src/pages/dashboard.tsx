@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import Link from "next/link";
-
-import layout from "../styles/layout.module.css";
-import styles from "../styles/Dashboard.module.css";
+import AppLayout from "../components/layout/AppLayout";
+import layout from "../../styles/layout.module.css";
+import styles from "../../styles/Dashboard.module.css";
 
 type Session = {
   id: string;
@@ -23,7 +22,7 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <>
+    <AppLayout>
       <h1 className={styles.title}>Dashboard</h1>
       <p className={styles.subtitle}>Track your recent study activity.</p>
 
@@ -48,12 +47,6 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
-
-      <div className={styles.actions}>
-        <Link href="/upload" className={styles.primaryBtn}>
-          Start New Study Session
-        </Link>
-      </div>
-    </>
+    </AppLayout>
   );
 }
