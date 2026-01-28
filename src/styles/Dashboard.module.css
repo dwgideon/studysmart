@@ -1,65 +1,71 @@
-.dashboardContainer {
-  min-height: 100vh;
-  padding: 40px;
-  background: linear-gradient(180deg, #f8faff, #eef2ff);
-  color: #1a1a1a;
-}
-
-.header {
-  text-align: center;
-  margin-bottom: 40px;
-}
-
-.header h1 {
+.title {
   font-size: 2rem;
-  margin-bottom: 8px;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
 }
 
-.usageSection {
-  margin-bottom: 40px;
-  text-align: center;
+.subtitle {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
 }
 
-.usageBar {
-  width: 100%;
-  height: 20px;
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: 12px;
-  overflow: hidden;
-  margin: 10px 0;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+.sectionTitle {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
 }
 
-.usageFill {
-  height: 100%;
-  transition: width 0.6s ease;
-  border-radius: 12px;
+/* Sessions */
+
+.sessionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
 }
 
-.actionsSection {
-  text-align: center;
+.sessionCard {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem;
 }
 
-.actionGrid {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-  justify-content: center;
+.sessionTopic {
+  font-weight: 700;
+  margin-bottom: 0.25rem;
 }
 
-.actionCard {
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(10px);
-  padding: 16px 24px;
-  border-radius: 14px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+.sessionScore {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
-.actionCard:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+.sessionDate {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+/* Actions */
+
+.actions {
+  margin-top: 2rem;
+}
+
+.primaryBtn {
+  background: linear-gradient(
+    90deg,
+    var(--accent-start),
+    var(--accent-end)
+  );
+  border: none;
+  color: #0b1020;
+  padding: 0.7rem 1.4rem;
+  border-radius: var(--radius-md);
+  font-weight: 800;
+  text-decoration: none;
+  display: inline-block;
 }

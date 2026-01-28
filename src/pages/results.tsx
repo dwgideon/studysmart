@@ -1,8 +1,8 @@
-import React, { useContext, useState, useEffect } from "react";
-import Head from "next/head";
-import { useRouter } from "next/router";
-import styles from "./Results.module.css";
-import { MaterialsContext } from "../context/MaterialsContext";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+
+import layout from "../styles/layout.module.css";
+import styles from "../styles/Results.module.css";
 
 /* ---------- Types ---------- */
 
@@ -27,88 +27,95 @@ type Materials = {
 
 /* ---------- Component ---------- */
 
-export default function Results() {
-  const router = useRouter();
-
-  const context = useContext(MaterialsContext) as { materials: Materials | null };
-  const materials = context?.materials ?? null;
+export default function ResultsPage() {
+  const [materials, setMaterials] = useState<Materials | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [tab, setTab] = useState<"flashcards" | "quiz" | "summary" | "guide">(
     "flashcards"
   );
 
-  /* ---------- Flashcards ---------- */
+  /* Flashcards */
+  const [cardIndex, setCardIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
 
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [isFlipped, setIsFlipped] = useState<boolean>(false);
+  /* Quiz */
+  const [currentQ, setCurrentQ] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [finished, setFinished] = useState(false);
+  const [score, setScore] = useState(0);
 
-  /* ---------- Quiz ---------- */
-
-  const quizQuestions: QuizQuestion[] = materials?.quizQuestions || [];
-  const [userAnswers, setUserAnswers] = useState<(string | null)[]>([]);
-  const [finished, setFinished] = useState<boolean>(false);
-  const [score, setScore] = useState<number>(0);
-
-  /* ---------- Redirect if no data ---------- */
-
-  useEffect(() => {
-    if (!materials) router.replace("/");
-  }, [materials, router]);
-
-  /* ---------- Init quiz answers ---------- */
+  /* ---------- Load Materials ---------- */
 
   useEffect(() => {
-    setUserAnswers(Array(quizQuestions.length).fill(null));
-  }, [quizQuestions.length]);
+    async function load() {
+      try {
+        const res = await fetch("/api/getNotes");
+        if (!res.ok) throw new Error("Failed to load materials");
 
+        const data = await res.json();
+        setMaterials(data);
+      } catch (err) {
+        console.error(err);
+        setError("Could not load your study materials.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    load();
+  }, []);
+
+  if (loading) return <p className={styles.loading}>Preparing your study session…</p>;
+  if (error) return <p className={styles.error}>{error}</p>;
   if (!materials) return null;
 
-  const flashcards = materials.flashcards || [];
-  const totalFlash = flashcards.length;
+  const { flashcards, quizQuestions, summary, studyGuide } = materials;
 
-  /* ---------- Flashcard flip ---------- */
+  /* ---------- Flashcard Flip ---------- */
 
   const handleFlip = () => {
-    if (isFlipped) return;
+    if (flipped) return;
 
-    setIsFlipped(true);
+    setFlipped(true);
 
     setTimeout(() => {
-      setIsFlipped(false);
-      setCurrentIndex((i) => (i + 1 < totalFlash ? i + 1 : 0));
-    }, 1000);
+      setFlipped(false);
+      setCardIndex((i) => (i + 1 < flashcards.length ? i + 1 : 0));
+    }, 900);
   };
 
-  /* ---------- Quiz handlers ---------- */
+  /* ---------- Save Session ---------- */
 
-  const handleSelect = (idx: number, choice: string) => {
-    if (finished) return;
-
-    const copy = [...userAnswers];
-    copy[idx] = choice;
-    setUserAnswers(copy);
-  };
-
-  const handleFinish = () => {
-    let count = 0;
-
-    quizQuestions.forEach((q, i) => {
-      if (userAnswers[i] === q.answer) count++;
-    });
-
-    setScore(count);
-    setFinished(true);
+  const saveSession = async (finalScore: number) => {
+    try {
+      await fetch("/api/saveSession", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: flashcards[0]?.question || "Study Session",
+          score: finalScore,
+          total: quizQuestions.length,
+          flashcardsCount: flashcards.length,
+          createdAt: new Date().toISOString(),
+        }),
+      });
+    } catch (e) {
+      console.error("Save session failed", e);
+    }
   };
 
   /* ---------- Render ---------- */
 
   return (
-    <div className={styles.container}>
-      <Head>
-        <title>StudySmart Results</title>
-      </Head>
-
-      <h1 className={styles.title}>Your AI-Generated Study Materials</h1>
+    <>
+      <h1 className={styles.title}>Your Study Materials</h1>
+      <p className={styles.subtitle}>
+        Review your study guide, test yourself with the quiz, or use flashcards
+        to lock it in.
+      </p>
 
       {/* ---------- Tabs ---------- */}
 
@@ -117,18 +124,12 @@ export default function Results() {
           <button
             key={t}
             className={`${styles.tab} ${tab === t ? styles.activeTab : ""}`}
-            onClick={() => {
-              setTab(t);
-              if (t === "flashcards") {
-                setCurrentIndex(0);
-                setIsFlipped(false);
-              }
-            }}
+            onClick={() => setTab(t)}
           >
             {t === "flashcards"
               ? "Flashcards"
               : t === "quiz"
-              ? "Quiz Questions"
+              ? "Quiz"
               : t === "summary"
               ? "Summary"
               : "Study Guide"}
@@ -138,116 +139,186 @@ export default function Results() {
 
       {/* ---------- Content ---------- */}
 
-      <div className={styles.content}>
-        {/* ---------- Flashcards ---------- */}
-
-        {tab === "flashcards" && totalFlash > 0 && (
-          <div className={styles.flashcardWrapper}>
+      <section className={layout.card}>
+        {/* FLASHCARDS */}
+        {tab === "flashcards" && flashcards.length > 0 && (
+          <div className={styles.flashWrap}>
             <div className={styles.flashcard} onClick={handleFlip}>
               <div
                 className={`${styles.cardInner} ${
-                  isFlipped ? styles.isFlipped : ""
+                  flipped ? styles.flipped : ""
                 }`}
               >
                 <div className={styles.cardFront}>
-                  {flashcards[currentIndex].question}
+                  {flashcards[cardIndex].question}
                 </div>
                 <div className={styles.cardBack}>
-                  {flashcards[currentIndex].answer}
+                  {flashcards[cardIndex].answer}
                 </div>
               </div>
             </div>
 
             <div className={styles.counter}>
-              Card {currentIndex + 1} of {totalFlash}
+              Card {cardIndex + 1} of {flashcards.length}
             </div>
           </div>
         )}
 
-        {/* ---------- Quiz ---------- */}
-
-        {tab === "quiz" && (
-          <div className={styles.quiz}>
-            {quizQuestions.map((q, i) => {
-              return (
-                <div key={i} className={styles.quizItem}>
-                  <p className={styles.quizQ}>{q.question}</p>
-
-                  <ul className={styles.choices}>
-                    {q.choices.map((c, j) => {
-                      const wrongPick =
-                        finished && userAnswers[i] === c && c !== q.answer;
-
-                      return (
-                        <li key={j}>
-                          <label
-                            className={`${wrongPick ? styles.incorrect : ""} ${
-                              finished && c === q.answer ? styles.correct : ""
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name={`quiz-${i}`}
-                              value={c}
-                              checked={userAnswers[i] === c}
-                              disabled={finished}
-                              onChange={() => handleSelect(i, c)}
-                            />{" "}
-                            {c}
-                          </label>
-                        </li>
-                      );
-                    })}
-                  </ul>
-
-                  {finished && q.explanation && (
-                    <div className={styles.explanation}>
-                      <strong>Why?</strong> {q.explanation}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
+        {/* QUIZ — STEP BY STEP */}
+        {tab === "quiz" && quizQuestions.length > 0 && (
+          <div className={styles.quizStep}>
             {!finished ? (
-              <button
-                className={styles.finishButton}
-                onClick={handleFinish}
-                disabled={userAnswers.includes(null)}
-              >
-                Finish Quiz
-              </button>
+              <>
+                <div className={styles.quizProgress}>
+                  Question {currentQ + 1} of {quizQuestions.length}
+                </div>
+
+                <p className={styles.quizQ}>
+                  {quizQuestions[currentQ].question}
+                </p>
+
+                <ul className={styles.choices}>
+                  {quizQuestions[currentQ].choices.map((c, j) => (
+                    <li key={j}>
+                      <label
+                        className={`${selected === c ? styles.selected : ""}`}
+                      >
+                        <input
+                          type="radio"
+                          name="quiz"
+                          checked={selected === c}
+                          onChange={() => setSelected(c)}
+                        />{" "}
+                        {c}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+
+                {showAnswer && (
+                  <div className={styles.feedback}>
+                    {selected === quizQuestions[currentQ].answer ? (
+                      <div className={styles.correct}>✅ Correct!</div>
+                    ) : (
+                      <div className={styles.incorrect}>
+                        ❌ Correct answer: {quizQuestions[currentQ].answer}
+                      </div>
+                    )}
+
+                    {quizQuestions[currentQ].explanation && (
+                      <p className={styles.explanation}>
+                        {quizQuestions[currentQ].explanation}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {!showAnswer ? (
+                  <button
+                    className={styles.primaryBtn}
+                    disabled={!selected}
+                    onClick={() => {
+                      if (selected === quizQuestions[currentQ].answer) {
+                        setScore((s) => s + 1);
+                      }
+                      setShowAnswer(true);
+                    }}
+                  >
+                    Check Answer
+                  </button>
+                ) : (
+                  <button
+                    className={styles.primaryBtn}
+                    onClick={() => {
+                      setShowAnswer(false);
+                      setSelected(null);
+
+                      if (currentQ + 1 < quizQuestions.length) {
+                        setCurrentQ((q) => q + 1);
+                      } else {
+                        const finalScore =
+                          score +
+                          (selected === quizQuestions[currentQ].answer ? 1 : 0);
+
+                        setFinished(true);
+                        saveSession(finalScore);
+                      }
+                    }}
+                  >
+                    Next Question →
+                  </button>
+                )}
+              </>
             ) : (
-              <div className={styles.score}>
-                You scored {score} out of {quizQuestions.length}
+              <div className={styles.scoreWrap}>
+                <h3 className={styles.scoreTitle}>Quiz Complete 🎉</h3>
+                <p className={styles.scoreText}>
+                  You scored {score} out of {quizQuestions.length}
+                </p>
+
+                <button
+                  className={styles.secondaryBtn}
+                  onClick={() => {
+                    setFinished(false);
+                    setScore(0);
+                    setCurrentQ(0);
+                    setSelected(null);
+                    setShowAnswer(false);
+                  }}
+                >
+                  Retake Quiz
+                </button>
               </div>
             )}
           </div>
         )}
 
-        {/* ---------- Summary ---------- */}
-
+        {/* SUMMARY */}
         {tab === "summary" && (
-          <div className={styles.summary}>
-            {materials.summary
+          <div className={styles.textBlock}>
+            {summary
               .split("\n")
               .filter((p) => p.trim())
-              .map((para, idx) => (
-                <p key={idx}>{para}</p>
+              .map((p, i) => (
+                <p key={i}>{p}</p>
               ))}
           </div>
         )}
 
-        {/* ---------- Study Guide ---------- */}
-
+        {/* STUDY GUIDE — FORMATTED */}
         {tab === "guide" && (
-          <ul className={styles.guide}>
-            {materials.studyGuide.map((item, i) => (
-              <li key={i}>{item}</li>
-            ))}
-          </ul>
+          <div className={styles.guideBlocks}>
+            {studyGuide.map((block, i) => {
+              const lines = block.split("\n").filter(Boolean);
+              const title = lines[0];
+              const bullets = lines.slice(1);
+
+              return (
+                <div key={i} className={styles.guideBlock}>
+                  <h4 className={styles.guideTitle}>{title}</h4>
+                  <ul className={styles.guideList}>
+                    {bullets.map((b, j) => (
+                      <li key={j}>{b.replace(/^[-•]\s*/, "")}</li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
         )}
+      </section>
+
+      {/* ---------- Actions ---------- */}
+
+      <div className={styles.actions}>
+        <Link href="/dashboard" className={styles.primaryBtn}>
+          Go to Dashboard
+        </Link>
+
+        <Link href="/upload" className={styles.secondaryBtn}>
+          Upload New Notes
+        </Link>
       </div>
-    </div>
+    </>
   );
 }

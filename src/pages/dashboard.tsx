@@ -1,62 +1,59 @@
 import { useEffect, useState } from "react";
-import Layout from "@/components/Layout";
+import Link from "next/link";
 
-export default function Dashboard() {
-  const [streak, setStreak] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
+import layout from "../styles/layout.module.css";
+import styles from "../styles/Dashboard.module.css";
+
+type Session = {
+  id: string;
+  topic: string;
+  score: number;
+  total: number;
+  created_at: string;
+};
+
+export default function DashboardPage() {
+  const [sessions, setSessions] = useState<Session[]>([]);
 
   useEffect(() => {
-    async function loadStats() {
-      try {
-        const res = await fetch("/api/study/stats");
-        const data: { streak: number } = await res.json();
-        setStreak(data.streak);
-      } catch (err) {
-        console.error("Failed to load stats", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadStats();
+    fetch("/api/getSessions")
+      .then((r) => r.json())
+      .then(setSessions)
+      .catch(console.error);
   }, []);
 
   return (
-    <Layout>
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+    <>
+      <h1 className={styles.title}>Dashboard</h1>
+      <p className={styles.subtitle}>Track your recent study activity.</p>
 
-        {/* STREAK CARD */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white p-6 shadow-lg">
-            <div className="text-sm uppercase tracking-wide opacity-90">
-              Study Streak
-            </div>
-            <div className="text-4xl font-extrabold mt-2">
-              {loading ? "…" : `🔥 ${streak} day${streak === 1 ? "" : "s"}`}
-            </div>
-          </div>
+      <section className={layout.card}>
+        <h2 className={styles.sectionTitle}>Recent Study Sessions</h2>
 
-          {/* PLACEHOLDERS FOR NEXT FEATURES */}
-          <div className="rounded-xl bg-gray-100 p-6">
-            <div className="text-sm uppercase tracking-wide text-gray-500">
-              XP
-            </div>
-            <div className="text-3xl font-bold mt-2 text-gray-800">
-              Coming Next
-            </div>
+        {sessions.length === 0 ? (
+          <p className={styles.muted}>No sessions yet. Start studying!</p>
+        ) : (
+          <div className={styles.sessionGrid}>
+            {sessions.map((s) => (
+              <div key={s.id} className={styles.sessionCard}>
+                <h4 className={styles.sessionTopic}>{s.topic}</h4>
+                <p className={styles.sessionScore}>
+                  Score: {s.score}/{s.total}
+                </p>
+                <p className={styles.sessionDate}>
+                  {new Date(s.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            ))}
           </div>
+        )}
+      </section>
 
-          <div className="rounded-xl bg-gray-100 p-6">
-            <div className="text-sm uppercase tracking-wide text-gray-500">
-              Accuracy
-            </div>
-            <div className="text-3xl font-bold mt-2 text-gray-800">
-              Coming Next
-            </div>
-          </div>
-        </div>
+      <div className={styles.actions}>
+        <Link href="/upload" className={styles.primaryBtn}>
+          Start New Study Session
+        </Link>
       </div>
-    </Layout>
+    </>
   );
 }

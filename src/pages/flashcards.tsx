@@ -3,6 +3,9 @@ import AnswerFeedback from "@/components/AnswerFeedback";
 import { useCardTimer } from "@/hooks/useCardTimer";
 import { calculatePoints } from "@/lib/scoring";
 
+import styles from "../styles/Flashcards.module.css";
+import layout from "../styles/layout.module.css";
+
 type Flashcard = {
   id: string;
   question: string;
@@ -21,7 +24,6 @@ export default function FlashcardsPage() {
 
   const currentCard = cards[index];
 
-  // Load flashcards
   useEffect(() => {
     fetch("/api/getFlashcards")
       .then((res) => res.json())
@@ -32,28 +34,25 @@ export default function FlashcardsPage() {
   }, []);
 
   const handleAnswer = async (correct: boolean) => {
-  stop();
+    stop();
 
-  // ✅ Send adaptive data to backend
-  await fetch("/api/review", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      cardId: currentCard.id,
-      correct,
-      seconds,
-    }),
-  });
+    await fetch("/api/review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cardId: currentCard.id,
+        correct,
+        seconds,
+      }),
+    });
 
-  // ✅ Points logic stays client-side
-  if (correct) {
-    setPoints((p) => p + calculatePoints(seconds));
-  }
+    if (correct) {
+      setPoints((p) => p + calculatePoints(seconds));
+    }
 
-  setLastCorrect(correct);
-  setShowFeedback(true);
-};
-
+    setLastCorrect(correct);
+    setShowFeedback(true);
+  };
 
   const nextCard = () => {
     setShowAnswer(false);
@@ -65,35 +64,31 @@ export default function FlashcardsPage() {
 
   if (!currentCard) {
     return (
-      <div className="max-w-xl mx-auto mt-20 text-center">
-        <h2 className="text-2xl font-bold">Session Complete 🎉</h2>
-        <p className="mt-4 text-lg">Total Points: {points}</p>
+      <div className={styles.completeWrap}>
+        <h2 className={styles.completeTitle}>Session Complete 🎉</h2>
+        <p className={styles.completePoints}>Total Points: {points}</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-xl mx-auto mt-16 px-4">
-      <div className="text-right text-sm text-gray-500">
-        ⏱ {seconds}s | ⭐ {points} pts
+    <>
+      <div className={styles.topBar}>
+        ⏱ {seconds}s&nbsp;&nbsp;•&nbsp;&nbsp;⭐ {points} pts
       </div>
 
-      <div className="mt-6 p-6 rounded-xl shadow bg-white">
-        <div className="text-xl font-semibold">
-          {currentCard.question}
-        </div>
+      <section className={layout.card}>
+        <div className={styles.question}>{currentCard.question}</div>
 
         {showAnswer && (
-          <div className="mt-4 text-lg text-gray-700">
-            {currentCard.answer}
-          </div>
+          <div className={styles.answer}>{currentCard.answer}</div>
         )}
 
-        <div className="mt-6 flex gap-3">
+        <div className={styles.controls}>
           {!showAnswer ? (
             <button
               onClick={() => setShowAnswer(true)}
-              className="px-4 py-2 rounded bg-indigo-600 text-white"
+              className={styles.primaryBtn}
             >
               Show Answer
             </button>
@@ -101,13 +96,13 @@ export default function FlashcardsPage() {
             <>
               <button
                 onClick={() => handleAnswer(true)}
-                className="px-4 py-2 rounded bg-green-600 text-white"
+                className={styles.successBtn}
               >
                 I Was Right
               </button>
               <button
                 onClick={() => handleAnswer(false)}
-                className="px-4 py-2 rounded bg-red-600 text-white"
+                className={styles.failBtn}
               >
                 I Missed It
               </button>
@@ -124,14 +119,11 @@ export default function FlashcardsPage() {
         )}
 
         {showFeedback && (
-          <button
-            onClick={nextCard}
-            className="mt-6 w-full px-4 py-2 rounded bg-gray-800 text-white"
-          >
+          <button onClick={nextCard} className={styles.nextBtn}>
             Next Card →
           </button>
         )}
-      </div>
-    </div>
+      </section>
+    </>
   );
 }
