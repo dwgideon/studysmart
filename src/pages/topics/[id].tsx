@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
-import Layout from "../../components/Layout";
+import AppLayout from "../../components/layout/AppLayout";
+import layout from "../../styles/layout.module.css";
 
 type Topic = {
   id: string;
@@ -63,68 +64,71 @@ export default function TopicDetails() {
     }
   };
 
-  if (loading)
-    return (
-      <Layout>
-        <p>Loading topic...</p>
-      </Layout>
-    );
-
-  if (!topic)
-    return (
-      <Layout>
-        <p>Topic not found.</p>
-      </Layout>
-    );
-
   return (
-    <Layout>
-      <div className="max-w-5xl mx-auto my-10 bg-white rounded shadow p-6">
-        <h1 className="text-3xl font-bold mb-4">{topic.title}</h1>
+    <AppLayout>
+      <section className={layout.card}>
+        {loading && <p>Loading topic...</p>}
 
-        {topic.image_url && (
-          <img
-            src={topic.image_url}
-            alt={topic.title}
-            className="w-full h-96 object-cover rounded mb-6"
-          />
+        {!loading && !topic && <p>Topic not found.</p>}
+
+        {!loading && topic && (
+          <>
+            <h1>{topic.title}</h1>
+
+            {topic.image_url && (
+              <img
+                src={topic.image_url}
+                alt={topic.title}
+                style={{
+                  width: "100%",
+                  maxHeight: 360,
+                  objectFit: "cover",
+                  borderRadius: 12,
+                  marginBottom: "1.5rem",
+                }}
+              />
+            )}
+
+            <button
+              onClick={handleGenerate}
+              disabled={generating}
+              style={{
+                padding: "0.75rem 1.25rem",
+                borderRadius: 10,
+                border: "none",
+                background: "linear-gradient(135deg, #5b8cff, #7c5cff)",
+                color: "#fff",
+                fontWeight: 600,
+                marginBottom: "1.5rem",
+                cursor: "pointer",
+              }}
+            >
+              {generating ? "Generating..." : "✨ Generate Study Materials"}
+            </button>
+
+            {summary && (
+              <div style={{ marginBottom: "2rem" }}>
+                <h3>Study Guide</h3>
+                <pre style={{ whiteSpace: "pre-wrap" }}>{summary}</pre>
+              </div>
+            )}
+
+            {flashcards && (
+              <div style={{ marginBottom: "2rem" }}>
+                <h3>Flashcards</h3>
+                <pre style={{ whiteSpace: "pre-wrap" }}>{flashcards}</pre>
+              </div>
+            )}
+
+            {quiz && (
+              <div style={{ marginBottom: "2rem" }}>
+                <h3>Quiz</h3>
+                <pre style={{ whiteSpace: "pre-wrap" }}>{quiz}</pre>
+              </div>
+            )}
+          </>
         )}
-
-        <button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="bg-blue-600 text-white px-6 py-3 rounded font-bold mb-6"
-        >
-          {generating ? "Generating..." : "✨ Generate Flashcards, Quiz & Summary"}
-        </button>
-
-        {summary && (
-          <div className="mb-10">
-            <h2 className="text-2xl font-semibold mb-2">Summary</h2>
-            <pre className="whitespace-pre-wrap bg-gray-100 p-4 rounded">
-              {summary}
-            </pre>
-          </div>
-        )}
-
-        {flashcards && (
-          <div className="mb-10">
-            <h2 className="text-2xl font-semibold mb-2">Flashcards</h2>
-            <pre className="whitespace-pre-wrap bg-gray-100 p-4 rounded">
-              {flashcards}
-            </pre>
-          </div>
-        )}
-
-        {quiz && (
-          <div className="mb-10">
-            <h2 className="text-2xl font-semibold mb-2">Quiz</h2>
-            <pre className="whitespace-pre-wrap bg-gray-100 p-4 rounded">
-              {quiz}
-            </pre>
-          </div>
-        )}
-      </div>
-    </Layout>
+      </section>
+    </AppLayout>
   );
 }
