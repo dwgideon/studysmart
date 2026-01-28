@@ -1,100 +1,96 @@
 import { useEffect, useState } from "react";
-import Layout from "../components/Layout";
-
+import AppLayout from "../components/layout/AppLayout";
+import layout from "../styles/layout.module.css";
 
 type Flashcard = {
-  id: string;
   question: string;
   answer: string;
-  wrongAnswers?: string[];
 };
 
 export default function PracticePage() {
-  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [showResults, setShowResults] = useState(false);
-
-  const currentCard = flashcards[currentIndex];
+  const [cards, setCards] = useState<Flashcard[]>([]);
+  const [index, setIndex] = useState(0);
+  const [showAnswer, setShowAnswer] = useState(false);
 
   useEffect(() => {
-    const fetchCards = async () => {
+    const loadPractice = async () => {
       try {
-        const res = await fetch("/api/study/smart");
+        const res = await fetch("/api/getNotes");
+        if (!res.ok) throw new Error("Failed to load practice cards");
+
         const data = await res.json();
-        setFlashcards(data.cards || []);
+        setCards(data.flashcards || []);
       } catch (err) {
-        console.error("Failed to load cards", err);
+        console.error("Practice load error:", err);
       }
     };
 
-    fetchCards();
+    loadPractice();
   }, []);
 
-  if (!flashcards.length) {
-    return (
-      <Layout>
-        <p>Loading flashcards...</p>
-      </Layout>
-    );
-  }
-
-  const choices: string[] = [
-    ...(currentCard?.wrongAnswers || []),
-    currentCard.answer,
-  ].sort(() => 0.5 - Math.random());
-
-  const handleAnswer = (choice: string) => {
-    if (choice === currentCard.answer) setScore((s) => s + 1);
-
-    if (currentIndex + 1 === flashcards.length) {
-      setShowResults(true);
-    } else {
-      setCurrentIndex((i) => i + 1);
-    }
+  const nextCard = () => {
+    setShowAnswer(false);
+    setIndex((i) => (i + 1 < cards.length ? i + 1 : 0));
   };
 
-  if (showResults) {
-    return (
-      <Layout>
-        <h2>Practice Complete 🎉</h2>
-        <p>
-          Score: {score} / {flashcards.length}
-        </p>
-        <button
-          onClick={() => {
-            setCurrentIndex(0);
-            setScore(0);
-            setShowResults(false);
-          }}
-        >
-          Try Again
-        </button>
-      </Layout>
-    );
-  }
-
   return (
-    <Layout>
-      <h3>{currentCard.question}</h3>
+    <AppLayout>
+      <section className={layout.card}>
+        <h1>Practice Flashcards</h1>
 
-      <ul style={{ listStyle: "none", padding: 0 }}>
-        {choices.map((c, idx) => (
-          <li key={idx} style={{ marginBottom: "0.5rem" }}>
-            <button
-              onClick={() => handleAnswer(c)}
+        {cards.length === 0 ? (
+          <p>No flashcards available. Upload notes to generate some first.</p>
+        ) : (
+          <>
+            <p style={{ marginBottom: "1rem" }}>
+              Card {index + 1} of {cards.length}
+            </p>
+
+            <div
               style={{
-                width: "100%",
-                padding: "12px",
-                borderRadius: "8px",
-                border: "1px solid #ccc",
+                padding: "1.5rem",
+                borderRadius: 12,
+                background: "rgba(255,255,255,0.04)",
+                marginBottom: "1rem",
               }}
             >
-              {c}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </Layout>
+              <strong>
+                {showAnswer ? cards[index].answer : cards[index].question}
+              </strong>
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button
+                onClick={() => setShowAnswer((s) => !s)}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "#444",
+                  color: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                {showAnswer ? "Show Question" : "Show Answer"}
+              </button>
+
+              <button
+                onClick={nextCard}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "linear-gradient(135deg, #5b8cff, #7c5cff)",
+                  color: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                Next →
+              </button>
+            </div>
+          </>
+        )}
+      </section>
+    </AppLayout>
   );
 }

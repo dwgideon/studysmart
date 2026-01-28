@@ -1,68 +1,111 @@
-// pages/quizzes.tsx
 import { useEffect, useState } from "react";
-import Layout from "@/components/Layout";
-import Link from "next/link";
+import AppLayout from "../components/layout/AppLayout";
+import layout from "../styles/layout.module.css";
 
-interface Quiz {
-  id: string;
-  topic: string;
-  type: string;
-  score: number;
-  createdAt: string;
-}
+type Quiz = {
+  question: string;
+  choices: string[];
+  answer: string;
+};
 
 export default function QuizzesPage() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [current, setCurrent] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [score, setScore] = useState(0);
+  const [finished, setFinished] = useState(false);
 
   useEffect(() => {
-    const fetchQuizzes = async () => {
-      const res = await fetch("/api/listQuizzes");
-      const data = await res.json();
-      setQuizzes(data.quizzes || []);
-      setLoading(false);
+    const load = async () => {
+      try {
+        const res = await fetch("/api/getNotes");
+        if (!res.ok) throw new Error("Failed to load quizzes");
+
+        const data = await res.json();
+        setQuizzes(data.quizQuestions || []);
+      } catch (err) {
+        console.error("Quiz load error:", err);
+      }
     };
 
-    fetchQuizzes();
+    load();
   }, []);
 
+  const next = () => {
+    if (!selected) return;
+
+    if (selected === quizzes[current].answer) {
+      setScore((s) => s + 1);
+    }
+
+    if (current + 1 < quizzes.length) {
+      setCurrent((c) => c + 1);
+      setSelected(null);
+    } else {
+      setFinished(true);
+    }
+  };
+
   return (
-    <Layout>
-      <div className="max-w-4xl mx-auto px-4 py-10">
-        <h1 className="text-3xl font-bold mb-6">📂 My Saved Quizzes</h1>
+    <AppLayout>
+      <section className={layout.card}>
+        <h1>Quiz Practice</h1>
 
-        {loading ? (
-          <p>Loading...</p>
-        ) : quizzes.length === 0 ? (
-          <p>You haven't saved any quizzes yet.</p>
+        {quizzes.length === 0 ? (
+          <p>No quizzes available. Upload notes to generate quizzes first.</p>
+        ) : finished ? (
+          <div>
+            <h2>Finished 🎉</h2>
+            <p>
+              You scored {score} out of {quizzes.length}
+            </p>
+          </div>
         ) : (
-          <ul className="space-y-4">
-            {quizzes.map((quiz) => (
-              <li
-                key={quiz.id}
-                className="border p-4 rounded flex items-center justify-between"
-              >
-                <div>
-                  <h2 className="font-semibold text-lg">
-                    🧠 {quiz.topic} ({quiz.type})
-                  </h2>
-                  <p className="text-sm text-gray-600">
-                    Score: {quiz.score} • Saved:{" "}
-                    {new Date(quiz.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
+          <>
+            <p>
+              Question {current + 1} of {quizzes.length}
+            </p>
 
-                <Link
-                  href={`/retake?id=${quiz.id}`}
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                >
-                  🔁 Retake
-                </Link>
-              </li>
-            ))}
-          </ul>
+            <h3 style={{ marginTop: "1rem" }}>
+              {quizzes[current].question}
+            </h3>
+
+            <ul style={{ marginTop: "1rem" }}>
+              {quizzes[current].choices.map((c, i) => (
+                <li key={i} style={{ marginBottom: "0.5rem" }}>
+                  <label style={{ cursor: "pointer" }}>
+                    <input
+                      type="radio"
+                      name="quiz"
+                      checked={selected === c}
+                      onChange={() => setSelected(c)}
+                      style={{ marginRight: "0.5rem" }}
+                    />
+                    {c}
+                  </label>
+                </li>
+              ))}
+            </ul>
+
+            <button
+              onClick={next}
+              disabled={!selected}
+              style={{
+                marginTop: "1rem",
+                padding: "0.6rem 1.2rem",
+                borderRadius: 10,
+                border: "none",
+                background: "linear-gradient(135deg, #5b8cff, #7c5cff)",
+                color: "#fff",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {current + 1 === quizzes.length ? "Finish Quiz" : "Next"}
+            </button>
+          </>
         )}
-      </div>
-    </Layout>
+      </section>
+    </AppLayout>
   );
 }
