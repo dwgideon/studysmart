@@ -1,77 +1,212 @@
-.page {
-  min-height: 100vh;
-  background: radial-gradient(circle at top, #eef2ff, #ffffff);
-  display: flex;
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+/* HERO */
+
+.heroWrap {
+  background: radial-gradient(circle at top, #0b1224, #020617);
+  color: white;
+  padding: 5rem 0 6rem;
+  position: relative;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 3rem;
   align-items: center;
-  justify-content: center;
 }
 
-.card {
-  width: 100%;
-  max-width: 460px;
-  padding: 2.5rem;
-  background: white;
-  border-radius: 18px;
-  box-shadow:
-    0 10px 25px rgba(80, 70, 150, 0.08),
-    0 2px 8px rgba(0,0,0,0.05);
+.heroText {
+  max-width: 520px;
 }
 
-.title {
-  font-size: 2.25rem;
-  text-align: center;
-  margin-bottom: 1.5rem;
+.h1 {
+  font-size: clamp(2.5rem, 4vw, 3.25rem);
   font-weight: 800;
-  background: linear-gradient(90deg,#6366f1,#14b8a6);
+  line-height: 1.1;
+}
+
+.accent {
+  background: linear-gradient(90deg, #60a5fa, #22d3ee);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-.form {
+.subtitle {
+  margin-top: 1rem;
+  font-size: 1.1rem;
+  color: #cbd5f5;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.75rem;
+}
+
+.btn {
+  padding: 0.65rem 1.1rem;
+  border-radius: 10px;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btnPrimary {
+  background: linear-gradient(135deg, #4361ee, #4cc9f0);
+  color: white;
+}
+
+.btnGhost {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: white;
+}
+
+.note {
+  margin-top: 1.25rem;
+  font-size: 0.95rem;
+  color: #94a3b8;
+}
+
+/* PREVIEW */
+
+.preview {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+
+.previewHead {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.tabs {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.tab {
+  font-size: 0.8rem;
+  opacity: 0.6;
+}
+
+.tabActive {
+  opacity: 1;
+  font-weight: 600;
+}
+
+.badge {
+  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+}
+
+.previewBody {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+}
+
+.previewStage {
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+/* FEATURES */
+
+.features {
+  padding: 4.5rem 0;
+  background: #f8fafc;
+}
+
+.h2 {
+  font-size: 2rem;
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.grid {
   display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.75rem;
+}
+
+.card {
+  background: white;
+  border-radius: 14px;
+  padding: 1.75rem;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+}
+
+.cardTitle {
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.cardText {
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+/* CTA */
+
+.ctaBand {
+  padding: 4rem 0;
+  background: linear-gradient(135deg, #4361ee, #4cc9f0);
+  color: white;
+}
+
+.ctaInner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+}
+
+.ctaTitle {
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.ctaText {
+  opacity: 0.9;
+}
+
+/* FOOTER */
+
+.footer {
+  background: #020617;
+  color: #94a3b8;
+  padding: 1.75rem 0;
+}
+
+.footerLinks {
+  display: flex;
   gap: 1rem;
 }
 
-.input,
-.select {
-  padding: 0.65rem 0.85rem;
-  font-size: 1rem;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  transition: border 0.15s, box-shadow 0.15s;
-}
+/* RESPONSIVE */
 
-.input:focus,
-.select:focus {
-  outline: none;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px rgba(99,102,241,0.15);
-}
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
 
-.button {
-  margin-top: .5rem;
-  width: 100%;
-  background: linear-gradient(90deg,#6366f1,#4f46e5);
-  color: white;
-  border: none;
-  border-radius: 10px;
-  padding: .75rem;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform .05s, box-shadow .15s;
-}
+  .grid {
+    grid-template-columns: 1fr;
+  }
 
-.button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(79,70,229,0.3);
-}
-
-.button:disabled {
-  opacity: .6;
-}
-
-.error {
-  color: #dc2626;
-  font-size: .9rem;
+  .ctaInner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }

@@ -14,13 +14,12 @@ export default function Landing() {
       </Head>
 
       {/* HERO */}
-      <section className={`${styles.heroWrap} ${styles.fadeIn}`}>
+      <section className={styles.heroWrap}>
         <div className={styles.container}>
           <div className={styles.hero}>
             <div className={styles.heroText}>
               <h1 className={styles.h1}>
-                Study Smarter.{" "}
-                <span className={styles.accent}>Every Time.</span>
+                Study Smarter. <span className={styles.accent}>Every Time.</span>
               </h1>
 
               <p className={styles.subtitle}>
@@ -75,7 +74,7 @@ export default function Landing() {
       </section>
 
       {/* FEATURES */}
-      <section className={`${styles.features} ${styles.fadeIn}`}>
+      <section className={styles.features}>
         <div className={styles.container}>
           <h2 className={styles.h2}>Why students love StudySmart</h2>
 
@@ -105,8 +104,8 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* CTA BAND */}
-      <section className={`${styles.ctaBand} ${styles.fadeIn}`}>
+      {/* CTA */}
+      <section className={styles.ctaBand}>
         <div className={styles.container}>
           <div className={styles.ctaInner}>
             <div>
@@ -129,7 +128,7 @@ export default function Landing() {
       </section>
 
       {/* FOOTER */}
-      <footer className={`${styles.footer} ${styles.fadeIn}`}>
+      <footer className={styles.footer}>
         <div className={styles.container}>
           <span>© {new Date().getFullYear()} StudySmart</span>
 
