@@ -1,129 +1,56 @@
 import { useEffect, useState } from "react";
-import AnswerFeedback from "@/components/AnswerFeedback";
-import { useCardTimer } from "@/hooks/useCardTimer";
-import { calculatePoints } from "@/lib/scoring";
-
-import styles from "../styles/Flashcards.module.css";
+import AppLayout from "../components/layout/AppLayout";
 import layout from "../styles/layout.module.css";
 
-type Flashcard = {
-  id: string;
-  question: string;
-  answer: string;
-};
+type Flashcard = { question: string; answer: string };
 
 export default function FlashcardsPage() {
   const [cards, setCards] = useState<Flashcard[]>([]);
-  const [index, setIndex] = useState(0);
-  const [showAnswer, setShowAnswer] = useState(false);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [lastCorrect, setLastCorrect] = useState<boolean | null>(null);
-  const [points, setPoints] = useState(0);
-
-  const { seconds, start, stop } = useCardTimer();
-
-  const currentCard = cards[index];
 
   useEffect(() => {
-    fetch("/api/getFlashcards")
-      .then((res) => res.json())
-      .then((data) => {
-        setCards(data.flashcards);
-        start();
-      });
+    const stored = sessionStorage.getItem("studyMaterials");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      setCards(parsed.flashcards || []);
+    }
   }, []);
 
-  const handleAnswer = async (correct: boolean) => {
-    stop();
-
-    await fetch("/api/review", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        cardId: currentCard.id,
-        correct,
-        seconds,
-      }),
-    });
-
-    if (correct) {
-      setPoints((p) => p + calculatePoints(seconds));
-    }
-
-    setLastCorrect(correct);
-    setShowFeedback(true);
-  };
-
-  const nextCard = () => {
-    setShowAnswer(false);
-    setShowFeedback(false);
-    setLastCorrect(null);
-    setIndex((i) => i + 1);
-    start();
-  };
-
-  if (!currentCard) {
-    return (
-      <div className={styles.completeWrap}>
-        <h2 className={styles.completeTitle}>Session Complete 🎉</h2>
-        <p className={styles.completePoints}>Total Points: {points}</p>
-      </div>
-    );
-  }
-
   return (
-    <>
-      <div className={styles.topBar}>
-        ⏱ {seconds}s&nbsp;&nbsp;•&nbsp;&nbsp;⭐ {points} pts
-      </div>
+    <AppLayout>
+      <h1>Flashcard Practice</h1>
 
       <section className={layout.card}>
-        <div className={styles.question}>{currentCard.question}</div>
+        {cards.length === 0 && <p>No flashcards found. Upload notes first.</p>}
 
-        {showAnswer && (
-          <div className={styles.answer}>{currentCard.answer}</div>
-        )}
-
-        <div className={styles.controls}>
-          {!showAnswer ? (
-            <button
-              onClick={() => setShowAnswer(true)}
-              className={styles.primaryBtn}
-            >
-              Show Answer
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={() => handleAnswer(true)}
-                className={styles.successBtn}
-              >
-                I Was Right
-              </button>
-              <button
-                onClick={() => handleAnswer(false)}
-                className={styles.failBtn}
-              >
-                I Missed It
-              </button>
-            </>
-          )}
-        </div>
-
-        {showFeedback && lastCorrect !== null && (
-          <AnswerFeedback
-            correct={lastCorrect}
-            seconds={seconds}
-            correctAnswer={currentCard.answer}
-          />
-        )}
-
-        {showFeedback && (
-          <button onClick={nextCard} className={styles.nextBtn}>
-            Next Card →
-          </button>
-        )}
+        {cards.map((c, i) => (
+          <FlipCard key={i} q={c.question} a={c.answer} />
+        ))}
       </section>
-    </>
+    </AppLayout>
+  );
+}
+
+function FlipCard({ q, a }: { q: string; a: string }) {
+  const [flipped, setFlipped] = useState(false);
+
+  return (
+    <div
+      onClick={() => setFlipped(!flipped)}
+      style={{
+        background: "linear-gradient(135deg, #020617, #0f172a)",
+        padding: "24px",
+        borderRadius: "20px",
+        marginBottom: "14px",
+        cursor: "pointer",
+        color: "white",
+        minHeight: "90px",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+      }}
+    >
+      <strong>{flipped ? a : q}</strong>
+      <div style={{ fontSize: "12px", opacity: 0.6, marginTop: "10px" }}>
+        Tap to flip
+      </div>
+    </div>
   );
 }
