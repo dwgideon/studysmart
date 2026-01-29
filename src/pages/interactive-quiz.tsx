@@ -1,6 +1,6 @@
 import { useState } from "react";
 import AppLayout from "../components/layout/AppLayout";
-import layout from "../../styles/layout.module.css";
+import layout from "../styles/layout.module.css";
 
 export default function InteractiveQuiz() {
   const [score] = useState(0);

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
 import AppLayout from "../../components/layout/AppLayout";
-import layout from "../../styles/layout.module.css";
+import layout from "../styles/layout.module.css";
 
 type Topic = {
   id: string;

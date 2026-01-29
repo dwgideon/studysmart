@@ -1,6 +1,6 @@
 import { useState } from "react";
 import AppLayout from "../components/layout/AppLayout";
-import layout from "../../styles/layout.module.css";
+import layout from "../styles/layout.module.css";
 
 export default function PracticePage() {
   const [, setI] = useState(0); // we only need the setter

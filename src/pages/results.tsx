@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AppLayout from "../components/layout/AppLayout";
-import layout from "../../styles/layout.module.css";
-import styles from "../../styles/Results.module.css";
+import layout from "../styles/layout.module.css";
+import styles from "../styles/Results.module.css";
 
 type Flashcard = { question: string; answer: string };
 type QuizQuestion = { question: string; answer: string; choices: string[] };

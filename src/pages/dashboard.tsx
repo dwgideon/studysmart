@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import AppLayout from "../components/layout/AppLayout";
-import layout from "../../styles/layout.module.css";
-import styles from "../../styles/Dashboard.module.css";
+import layout from "../styles/layout.module.css";
+import styles from "../styles/Dashboard.module.css";
+
 
 type Session = {
   id: string;
