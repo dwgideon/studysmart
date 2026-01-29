@@ -1,7 +1,6 @@
 import Head from "next/head";
 import Link from "next/link";
 import styles from "../styles/Landing.module.css";
-import Header from "@/components/Header";
 
 export default function Home() {
   return (
@@ -13,8 +12,6 @@ export default function Home() {
           content="Upload your notes and instantly get AI-generated flashcards, quizzes, and study guides."
         />
       </Head>
-
-      <Header />
 
       {/* HERO */}
       <section className={styles.hero}>
