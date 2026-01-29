@@ -1,5 +1,5 @@
 import Header from "@/components/Header";
-import layout from "@/styles/Layout.module.css";
+import layout from "@/styles/layout.module.css";
 
 type Props = {
   children: React.ReactNode;
