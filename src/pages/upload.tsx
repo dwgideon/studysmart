@@ -10,6 +10,11 @@ export default function UploadPage() {
   const [error, setError] = useState("");
 
   async function handleSubmit() {
+    if (!text.trim()) {
+      setError("Please paste some notes first.");
+      return;
+    }
+
     setError("");
     setLoading(true);
 
@@ -24,7 +29,7 @@ export default function UploadPage() {
 
       const data = await res.json();
 
-      // ✅ store generated materials for results page
+      // store for results page
       sessionStorage.setItem("studyMaterials", JSON.stringify(data));
 
       router.push("/results");
@@ -38,22 +43,31 @@ export default function UploadPage() {
 
   return (
     <AppLayout>
-      <h1>Upload or Paste Your Notes</h1>
+      <div className={styles.wrapper}>
+        <h1 className={styles.title}>Upload or Paste Your Notes</h1>
+        <p className={styles.subtitle}>
+          Add your class notes and StudySmart will generate quizzes, flashcards, and study guides automatically.
+        </p>
 
-      <textarea
-        id="notes"
-        name="notes"
-        className={styles.textarea}
-        placeholder="Paste your notes here..."
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-      />
+        <textarea
+          id="notes"
+          name="notes"
+          className={styles.textarea}
+          placeholder="Paste your notes here..."
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
 
-      {error && <p className={styles.error}>{error}</p>}
+        {error && <p className={styles.error}>{error}</p>}
 
-      <button className={styles.button} onClick={handleSubmit} disabled={loading}>
-        {loading ? <span className={styles.spinner} /> : "Generate Study Materials"}
-      </button>
+        <button
+          className={styles.button}
+          onClick={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? <span className={styles.spinner} /> : "Generate Study Materials"}
+        </button>
+      </div>
     </AppLayout>
   );
 }

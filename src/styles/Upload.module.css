@@ -1,29 +1,61 @@
+.wrapper {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+
+.title {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  color: #cbd5e1;
+  margin-bottom: 24px;
+}
+
 .textarea {
   width: 100%;
-  min-height: 220px;
-  padding: 14px;
-  border-radius: 12px;
+  min-height: 260px;
+  padding: 16px;
+  border-radius: 14px;
   border: none;
-  background: #1e293b;
+  background: rgba(30, 41, 59, 0.9);
   color: white;
   font-size: 16px;
+  resize: vertical;
+  outline: none;
+}
+
+.textarea::placeholder {
+  color: #94a3b8;
 }
 
 .button {
-  margin-top: 16px;
+  margin-top: 20px;
   width: 100%;
-  padding: 14px;
+  padding: 16px;
   border-radius: 999px;
   border: none;
   background: linear-gradient(90deg, #6366f1, #38bdf8);
   color: white;
-  font-weight: bold;
+  font-weight: 700;
+  font-size: 16px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.button:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
 }
 
 .error {
   color: #f87171;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .spinner {
