@@ -1,5 +1,5 @@
-import React from "react";
-import layout from "../../styles/layout.module.css";
+import Header from "@/components/Header";
+import layout from "@/styles/Layout.module.css";
 
 type Props = {
   children: React.ReactNode;
@@ -7,8 +7,9 @@ type Props = {
 
 export default function AppLayout({ children }: Props) {
   return (
-    <div className={layout.page}>
-      <div className={layout.container}>{children}</div>
+    <div className={layout.appShell}>
+      <Header />
+      <main className={layout.mainContent}>{children}</main>
     </div>
   );
 }
