@@ -1,38 +1,71 @@
-import { useEffect } from "react";
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
+import AppLayout from "../../components/layout/AppLayout";
+import layout from "../../styles/layout.module.css";
 
-type QuizQuestion = {
-  id: string;
-  question: string;
-  answer: string;
-  userAnswer?: string;
+type TopicData = {
+  title: string;
+  description: string;
+  lessons: string[];
 };
 
-export default function QuizResultsPage() {
+export default function TopicPage() {
+  const router = useRouter();
+  const { id } = router.query;
+
+  const [topic, setTopic] = useState<TopicData | null>(null);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!id) return;
 
-    // Placeholder until real results are wired in
-    const incorrect: QuizQuestion[] = [];
+    const loadTopic = async () => {
+      try {
+        // 🔧 placeholder — later this will come from DB
+        setTopic({
+          title: String(id).replace(/-/g, " "),
+          description:
+            "This topic will help you master key concepts through guided practice, quizzes, and flashcards.",
+          lessons: [
+            "Introduction and Key Terms",
+            "Worked Examples",
+            "Practice Problems",
+            "Quiz Review",
+          ],
+        });
+      } catch (err) {
+        console.error("Failed to load topic", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const topic = "demo";
-    const type = "quiz";
-
-    localStorage.setItem("retryQuestions", JSON.stringify(incorrect));
-
-    localStorage.setItem(
-      "retryMeta",
-      JSON.stringify({
-        topic,
-        type,
-        count: incorrect.length,
-      })
-    );
-  }, []);
+    loadTopic();
+  }, [id]);
 
   return (
-    <div style={{ padding: 24 }}>
-      <h1>Quiz Results</h1>
-      <p>Preparing retry options...</p>
-    </div>
+    <AppLayout>
+      <section className={layout.card}>
+        {loading ? (
+          <p>Loading topic…</p>
+        ) : !topic ? (
+          <p>Topic not found.</p>
+        ) : (
+          <>
+            <h1 style={{ marginBottom: "0.5rem" }}>{topic.title}</h1>
+            <p style={{ opacity: 0.8, marginBottom: "1.25rem" }}>
+              {topic.description}
+            </p>
+
+            <h3>What you’ll cover:</h3>
+            <ul style={{ marginTop: "0.5rem" }}>
+              {topic.lessons.map((l, i) => (
+                <li key={i}>{l}</li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+    </AppLayout>
   );
 }
