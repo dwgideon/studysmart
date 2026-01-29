@@ -1,22 +1,26 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-
-import layout from "../styles/layout.module.css";
-import styles from "../styles/Upload.module.css";
+import styles from "@/styles/Upload.module.css";
 
 export default function UploadPage() {
   const router = useRouter();
 
+  const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
-  const handleSubmit = async () => {
-    setError(null);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+    }
+  };
 
-    if (!file && !notes.trim()) {
-      setError("Please upload a file or paste your notes to continue.");
+  const handleGenerate = async () => {
+    setError("");
+
+    if (!file && !text.trim()) {
+      setError("Please upload a file or paste your notes.");
       return;
     }
 
@@ -25,7 +29,7 @@ export default function UploadPage() {
     try {
       const formData = new FormData();
       if (file) formData.append("file", file);
-      if (notes) formData.append("notes", notes);
+      if (text) formData.append("text", text);
 
       const res = await fetch("/api/upload", {
         method: "POST",
@@ -33,14 +37,16 @@ export default function UploadPage() {
       });
 
       if (!res.ok) {
-        throw new Error("Upload failed");
+        const msg = await res.text();
+        throw new Error(msg || "Upload failed");
       }
 
-      // 👉 Next phase: route to /results (quiz + study guide)
-      // For now, send to dashboard or results depending on what you have ready
+      const data = await res.json();
+
+      // you may want to store session id later
       router.push("/results");
     } catch (err) {
-      console.error(err);
+      console.error("UPLOAD ERROR:", err);
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
@@ -48,48 +54,49 @@ export default function UploadPage() {
   };
 
   return (
-    <>
+    <div className={styles.page}>
       <h1 className={styles.title}>Upload or Paste Your Notes</h1>
-
       <p className={styles.subtitle}>
         Add your class notes and StudySmart will generate quizzes, flashcards,
         and study guides automatically.
       </p>
 
-      <section className={layout.card}>
-        {/* FILE UPLOAD */}
+      <div className={styles.card}>
         <label className={styles.uploadBox}>
-          <input
-            type="file"
-            hidden
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-          />
-
-          <div className={styles.uploadText}>
-            {file ? `📄 ${file.name}` : "Click to upload a file (PDF, image, doc)"}
-          </div>
+          <input type="file" hidden onChange={handleFileChange} />
+          {file ? (
+            <span>📄 {file.name}</span>
+          ) : (
+            <span>Click to upload a file</span>
+          )}
         </label>
 
-        <div className={styles.divider}>or</div>
+        <div className={styles.or}>or</div>
 
-        {/* PASTE NOTES */}
         <textarea
           className={styles.textarea}
           placeholder="Paste your notes here..."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
         />
 
-        {error && <div className={styles.error}>{error}</div>}
+        {error && <p className={styles.error}>{error}</p>}
 
         <button
-          onClick={handleSubmit}
-          className={styles.primaryBtn}
+          className={styles.generateBtn}
+          onClick={handleGenerate}
           disabled={loading}
         >
-          {loading ? "Generating…" : "Generate Study Materials"}
+          {loading ? (
+            <span className={styles.spinnerWrap}>
+              <span className={styles.spinner} />
+              Generating…
+            </span>
+          ) : (
+            "Generate Study Materials"
+          )}
         </button>
-      </section>
-    </>
+      </div>
+    </div>
   );
 }
