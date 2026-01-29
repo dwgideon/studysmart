@@ -41,7 +41,7 @@ export default function UploadPage() {
         throw new Error(msg || "Upload failed");
       }
 
-      const data = await res.json();
+      await res.json();
 
       // you may want to store session id later
       router.push("/results");
