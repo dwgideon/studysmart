@@ -1,20 +1,24 @@
+// src/pages/upload.tsx
 import { useState } from "react";
 import { useRouter } from "next/router";
 import styles from "./Upload.module.css";
 
 export default function UploadPage() {
-  const [notes, setNotes] = useState("");
+  const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleSubmit = async () => {
-    if (!notes && !file) return;
+  async function handleSubmit() {
+    if (!text && !file) {
+      alert("Please paste notes or upload a file.");
+      return;
+    }
 
     setLoading(true);
 
     const formData = new FormData();
-    if (notes) formData.append("notes", notes);
+    if (text) formData.append("text", text);
     if (file) formData.append("file", file);
 
     const res = await fetch("/api/processMaterials", {
@@ -22,33 +26,41 @@ export default function UploadPage() {
       body: formData,
     });
 
-    const data = await res.json();
+    const result = await res.json();
+
     setLoading(false);
 
-    router.push(`/results?sessionId=${data.sessionId}`);
-  };
+    if (result.sessionId) {
+      router.push(`/results?sessionId=${result.sessionId}`);
+    } else {
+      alert("Something went wrong generating materials.");
+    }
+  }
 
   return (
     <div className={styles.page}>
       <div className={styles.card}>
         <h1>Upload Your Study Material</h1>
-        <p className={styles.subtitle}>
-          Paste notes, lesson text, or upload a file
-        </p>
+        <p>Paste notes, lesson text, or upload a file</p>
 
         <textarea
           className={styles.textarea}
           placeholder="Paste notes here..."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
         />
 
         <div className={styles.fileRow}>
-          <input
-            type="file"
-            id="fileUpload"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-          />
+          <label className={styles.fileLabel}>
+            Upload File
+            <input
+              type="file"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              hidden
+            />
+          </label>
+
+          {file && <span className={styles.fileName}>{file.name}</span>}
         </div>
 
         <button

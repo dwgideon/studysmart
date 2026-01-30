@@ -1,0 +1,17 @@
+.page {
+  min-height: 100vh;
+  padding: 60px;
+  background: radial-gradient(circle at top, #0b1c36, #020617);
+  color: white;
+}
+
+.button {
+  margin-top: 20px;
+  padding: 12px 24px;
+  font-size: 16px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(90deg, #6366f1, #3b82f6);
+  color: white;
+  cursor: pointer;
+}
