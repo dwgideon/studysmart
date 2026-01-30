@@ -1,73 +1,67 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-import AppLayout from "../components/layout/AppLayout";
 import styles from "../styles/Upload.module.css";
 
 export default function UploadPage() {
-  const router = useRouter();
-  const [text, setText] = useState("");
+  const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const router = useRouter();
 
-  async function handleSubmit() {
-    if (!text.trim()) {
+  const handleSubmit = async () => {
+    if (!notes.trim()) {
       setError("Please paste some notes first.");
       return;
     }
 
-    setError("");
     setLoading(true);
+    setError("");
 
     try {
       const res = await fetch("/api/processMaterials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ notes }),
       });
 
       if (!res.ok) throw new Error("Processing failed");
 
-      const data = await res.json();
+      const json = await res.json();
 
-      // store for results page
-      sessionStorage.setItem("studyMaterials", JSON.stringify(data));
-
-      router.push("/results");
-    } catch (e) {
-      console.error(e);
+      router.push({
+        pathname: "/results",
+        query: { sessionId: json.sessionId },
+      });
+    } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
-    <AppLayout>
-      <div className={styles.wrapper}>
-        <h1 className={styles.title}>Upload or Paste Your Notes</h1>
-        <p className={styles.subtitle}>
-          Add your class notes and StudySmart will generate quizzes, flashcards, and study guides automatically.
-        </p>
+    <div className={styles.page}>
+      <h1>Upload or Paste Your Notes</h1>
+      <p>Add your class notes and StudySmart will generate materials.</p>
 
-        <textarea
-          id="notes"
-          name="notes"
-          className={styles.textarea}
-          placeholder="Paste your notes here..."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
+      <textarea
+        id="notes"
+        name="notes"
+        className={styles.textarea}
+        placeholder="Paste your notes here..."
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+      />
 
-        {error && <p className={styles.error}>{error}</p>}
+      {error && <p className={styles.error}>{error}</p>}
 
-        <button
-          className={styles.button}
-          onClick={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? <span className={styles.spinner} /> : "Generate Study Materials"}
-        </button>
-      </div>
-    </AppLayout>
+      <button
+        className={styles.button}
+        onClick={handleSubmit}
+        disabled={loading}
+      >
+        {loading ? <span className={styles.spinner} /> : "Generate Study Materials"}
+      </button>
+    </div>
   );
 }
