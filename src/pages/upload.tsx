@@ -8,7 +8,12 @@ export default function UploadPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleSubmit() {
+  const handleSubmit = async () => {
+    if (!text.trim()) {
+      setError("Please paste notes or upload content.");
+      return;
+    }
+
     setError("");
     setLoading(true);
 
@@ -23,22 +28,29 @@ export default function UploadPage() {
         throw new Error("Upload failed");
       }
 
-      router.push("/results");
+      const result = await res.json();
+
+      router.push(`/results?sessionId=${result.sessionId}`);
     } catch (err) {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <h1>Upload or Paste Your Notes</h1>
+        <h1 className={styles.title}>Upload Your Study Material</h1>
+        <p className={styles.subtitle}>
+          Paste notes, lesson text, or study material below
+        </p>
 
         <textarea
+          id="notes"
+          name="notes"
           className={styles.textarea}
-          placeholder="Paste your notes here…"
+          placeholder="Paste notes here…"
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
@@ -50,10 +62,12 @@ export default function UploadPage() {
           onClick={handleSubmit}
           disabled={loading}
         >
-          {loading ? "Processing…" : "Generate Study Material"}
+          {loading ? (
+            <span className={styles.spinner} />
+          ) : (
+            "Generate Flashcards & Quizzes"
+          )}
         </button>
-
-        {loading && <div className={styles.spinner} />}
       </div>
     </div>
   );
