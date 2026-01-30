@@ -1,61 +1,45 @@
 import { useEffect, useState } from "react";
-import AppLayout from "@/components/layout/AppLayout";
-import styles from "@/styles/Flashcards.module.css";
+import styles from "../styles/Flashcards.module.css";
 
 type Flashcard = {
-  front: string;
-  back: string;
+  question: string;
+  answer: string;
 };
 
 export default function FlashcardsPage() {
   const [cards, setCards] = useState<Flashcard[]>([]);
-  const [index, setIndex] = useState(0);
-  const [showBack, setShowBack] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
-      const res = await fetch("/api/getNotes");
-      const json: { flashcards?: Flashcard[] } = await res.json();
-      setCards(json.flashcards ?? []);
+      try {
+        const res = await fetch("/api/processMaterials");
+        const json = await res.json();
+        setCards(Array.isArray(json.flashcards) ? json.flashcards : []);
+      } catch {
+        setCards([]);
+      } finally {
+        setLoading(false);
+      }
     }
+
     load();
   }, []);
 
-  if (cards.length === 0) {
-    return (
-      <AppLayout>
-        <p>No flashcards available.</p>
-      </AppLayout>
-    );
-  }
-
-  const card = cards[index];
+  if (loading) return <p className={styles.loading}>Loading…</p>;
 
   return (
-    <AppLayout>
-      <div className={styles.card} onClick={() => setShowBack(!showBack)}>
-        {showBack ? card.back : card.front}
-      </div>
+    <div className={styles.page}>
+      <h1>Flashcards</h1>
 
-      <div className={styles.controls}>
-        <button
-          onClick={() => {
-            setIndex((i) => Math.max(i - 1, 0));
-            setShowBack(false);
-          }}
-        >
-          Prev
-        </button>
-
-        <button
-          onClick={() => {
-            setIndex((i) => Math.min(i + 1, cards.length - 1));
-            setShowBack(false);
-          }}
-        >
-          Next
-        </button>
+      <div className={styles.grid}>
+        {cards.map((card, i) => (
+          <div key={i} className={styles.card}>
+            <h3>{card.question}</h3>
+            <p>{card.answer}</p>
+          </div>
+        ))}
       </div>
-    </AppLayout>
+    </div>
   );
 }

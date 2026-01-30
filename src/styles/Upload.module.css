@@ -1,75 +1,55 @@
-.wrapper {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 48px 24px 80px;
+.page {
+  display: flex;
+  justify-content: center;
+  padding: 4rem 1rem;
 }
 
-.title {
-  font-size: 36px;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-
-.subtitle {
-  color: #cbd5e1;
-  margin-bottom: 24px;
+.card {
+  width: 100%;
+  max-width: 700px;
+  background: #111;
+  padding: 2rem;
+  border-radius: 12px;
 }
 
 .textarea {
   width: 100%;
-  min-height: 260px;
-  padding: 16px;
-  border-radius: 14px;
-  border: none;
-  background: rgba(30, 41, 59, 0.9);
+  height: 200px;
+  margin-top: 1rem;
+  background: #1a1a1a;
   color: white;
-  font-size: 16px;
-  resize: vertical;
-  outline: none;
-}
-
-.textarea::placeholder {
-  color: #94a3b8;
+  border: 1px solid #333;
+  padding: 1rem;
+  border-radius: 8px;
 }
 
 .button {
-  margin-top: 20px;
-  width: 100%;
-  padding: 16px;
-  border-radius: 999px;
+  margin-top: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #6366f1, #ec4899);
   border: none;
-  background: linear-gradient(90deg, #6366f1, #38bdf8);
+  border-radius: 999px;
   color: white;
-  font-weight: 700;
-  font-size: 16px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.button:disabled {
-  opacity: 0.8;
-  cursor: not-allowed;
-}
-
-.error {
-  color: #f87171;
-  margin-top: 10px;
 }
 
 .spinner {
-  width: 22px;
-  height: 22px;
-  border: 3px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
+  margin-top: 1rem;
+  width: 32px;
+  height: 32px;
+  border: 3px solid #444;
+  border-top-color: #6366f1;
   border-radius: 50%;
-  display: inline-block;
-  animation: spin 0.8s linear infinite;
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
+}
+
+.error {
+  color: #f87171;
+  margin-top: 0.5rem;
 }

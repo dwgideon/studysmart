@@ -1,20 +1,32 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { randomUUID } from "crypto";
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
 
 export default async function handler(
-  _req: NextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // TODO: parse file, extract text, save to Supabase
-  // For now, return a guaranteed sessionId
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
-  const sessionId = randomUUID();
+  try {
+    // Placeholder processing (you will enhance later)
+    const flashcards = [
+      { question: "Sample Question", answer: "Sample Answer" },
+    ];
 
-  res.status(200).json({ sessionId });
+    res.status(200).json({
+      sessionId: "temp-session-id",
+      notes: [],
+      flashcards,
+      quizzes: [],
+    });
+  } catch (error) {
+    console.error("processMaterials error:", error);
+    res.status(500).json({
+      sessionId: null,
+      notes: [],
+      flashcards: [],
+      quizzes: [],
+    });
+  }
 }

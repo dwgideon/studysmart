@@ -1,28 +1,21 @@
 import { useEffect, useState } from "react";
-import { useRouter } from "next/router";
-import AppLayout from "@/components/layout/AppLayout";
-import styles from "@/styles/Results.module.css";
+import styles from "../styles/Results.module.css";
 
 type Flashcard = {
-  front: string;
-  back: string;
+  question: string;
+  answer: string;
 };
 
 export default function ResultsPage() {
-  const router = useRouter();
-  const { sessionId } = router.query;
-
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!sessionId) return;
-
-    async function loadResults() {
+    async function load() {
       try {
-        const res = await fetch(`/api/getNotes?sessionId=${sessionId}`);
-        const json: { flashcards?: Flashcard[] } = await res.json();
-        setFlashcards(json.flashcards ?? []);
+        const res = await fetch("/api/processMaterials");
+        const json = await res.json();
+        setFlashcards(Array.isArray(json.flashcards) ? json.flashcards : []);
       } catch {
         setFlashcards([]);
       } finally {
@@ -30,30 +23,29 @@ export default function ResultsPage() {
       }
     }
 
-    loadResults();
-  }, [sessionId]);
+    load();
+  }, []);
 
   if (loading) {
-    return (
-      <AppLayout>
-        <p>Loading results…</p>
-      </AppLayout>
-    );
+    return <p className={styles.loading}>Loading results…</p>;
   }
 
   return (
-    <AppLayout>
-      <div className={styles.container}>
-        <h1>Your Study Materials</h1>
+    <div className={styles.page}>
+      <h1>Your Flashcards</h1>
 
-        <button onClick={() => router.push("/flashcards")}>
-          Review Flashcards
-        </button>
+      {flashcards.length === 0 && (
+        <p>No flashcards generated yet.</p>
+      )}
 
-        {flashcards.length === 0 && (
-          <p>No flashcards generated yet.</p>
-        )}
+      <div className={styles.grid}>
+        {flashcards.map((card, i) => (
+          <div key={i} className={styles.card}>
+            <strong>{card.question}</strong>
+            <p>{card.answer}</p>
+          </div>
+        ))}
       </div>
-    </AppLayout>
+    </div>
   );
 }

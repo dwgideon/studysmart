@@ -1,94 +1,19 @@
-.topBar {
-  text-align: right;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin-bottom: 1rem;
+.page {
+  padding: 3rem;
 }
 
-.question {
-  font-size: 1.4rem;
-  font-weight: 700;
-  text-align: center;
-  margin-bottom: 1.25rem;
+.grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
 
-.answer {
-  font-size: 1.1rem;
-  text-align: center;
-  color: var(--text-secondary);
-  margin-bottom: 1.5rem;
+.card {
+  background: #111;
+  padding: 1rem;
+  border-radius: 10px;
 }
 
-.controls {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: center;
-  margin-top: 1.5rem;
-  flex-wrap: wrap;
-}
-
-/* Buttons */
-
-.primaryBtn {
-  background: linear-gradient(
-    90deg,
-    var(--accent-start),
-    var(--accent-end)
-  );
-  border: none;
-  color: #0b1020;
-  padding: 0.6rem 1.25rem;
-  border-radius: var(--radius-md);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.successBtn {
-  background: #16a34a;
-  border: none;
-  color: white;
-  padding: 0.6rem 1.25rem;
-  border-radius: var(--radius-md);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.failBtn {
-  background: #dc2626;
-  border: none;
-  color: white;
-  padding: 0.6rem 1.25rem;
-  border-radius: var(--radius-md);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.nextBtn {
-  margin-top: 1.75rem;
-  width: 100%;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-primary);
-  padding: 0.6rem 1.25rem;
-  border-radius: var(--radius-md);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-/* Completion */
-
-.completeWrap {
-  text-align: center;
-  margin-top: 6rem;
-}
-
-.completeTitle {
-  font-size: 2rem;
-  font-weight: 800;
-  margin-bottom: 0.75rem;
-}
-
-.completePoints {
-  font-size: 1.1rem;
-  color: var(--text-secondary);
+.loading {
+  padding: 3rem;
 }
