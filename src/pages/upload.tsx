@@ -1,36 +1,37 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-import styles from "../styles/Upload.module.css";
+import styles from "@/styles/Upload.module.css";
 
 export default function UploadPage() {
   const router = useRouter();
-  const [text, setText] = useState("");
+  const [notes, setNotes] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async () => {
-    if (!text.trim()) {
-      setError("Please paste notes or upload content.");
+    if (!notes && !file) {
+      setError("Please paste notes or upload a file.");
       return;
     }
 
-    setError("");
     setLoading(true);
+    setError("");
 
     try {
+      const formData = new FormData();
+      if (notes) formData.append("notes", notes);
+      if (file) formData.append("file", file);
+
       const res = await fetch("/api/processMaterials", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: formData,
       });
 
-      if (!res.ok) {
-        throw new Error("Upload failed");
-      }
+      if (!res.ok) throw new Error("Upload failed");
 
-      const result = await res.json();
-
-      router.push(`/results?sessionId=${result.sessionId}`);
+      const data = await res.json();
+      router.push(`/results?sessionId=${data.sessionId}`);
     } catch (err) {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -43,16 +44,27 @@ export default function UploadPage() {
       <div className={styles.card}>
         <h1 className={styles.title}>Upload Your Study Material</h1>
         <p className={styles.subtitle}>
-          Paste notes, lesson text, or study material below
+          Paste notes, lesson text, or upload a file to generate flashcards and quizzes.
         </p>
 
+        {/* File Upload */}
+        <label className={styles.fileLabel}>
+          Upload a file
+          <input
+            type="file"
+            className={styles.fileInput}
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+          />
+        </label>
+
+        <div className={styles.or}>OR</div>
+
+        {/* Notes */}
         <textarea
-          id="notes"
-          name="notes"
           className={styles.textarea}
-          placeholder="Paste notes here…"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
+          placeholder="Paste notes here..."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
         />
 
         {error && <p className={styles.error}>{error}</p>}
@@ -62,11 +74,7 @@ export default function UploadPage() {
           onClick={handleSubmit}
           disabled={loading}
         >
-          {loading ? (
-            <span className={styles.spinner} />
-          ) : (
-            "Generate Flashcards & Quizzes"
-          )}
+          {loading ? "Generating…" : "Generate Flashcards & Quizzes"}
         </button>
       </div>
     </div>
