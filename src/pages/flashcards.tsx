@@ -1,39 +1,61 @@
 import { useEffect, useState } from "react";
-import styles from "../styles/Flashcards.module.css";
+import AppLayout from "@/components/layout/AppLayout";
+import styles from "@/styles/Flashcards.module.css";
 
 type Flashcard = {
-  id: string;
-  question: string;
-  answer: string;
+  front: string;
+  back: string;
 };
 
 export default function FlashcardsPage() {
   const [cards, setCards] = useState<Flashcard[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [index, setIndex] = useState(0);
+  const [showBack, setShowBack] = useState(false);
 
   useEffect(() => {
-    fetch("/api/getFlashcards")
-      .then((res) => res.json())
-      .then((json) => {
-        setCards(json.flashcards ?? []);
-        setLoading(false);
-      });
+    async function load() {
+      const res = await fetch("/api/getNotes");
+      const json: { flashcards?: Flashcard[] } = await res.json();
+      setCards(json.flashcards ?? []);
+    }
+    load();
   }, []);
 
-  if (loading) return <p>Loading flashcards…</p>;
+  if (cards.length === 0) {
+    return (
+      <AppLayout>
+        <p>No flashcards available.</p>
+      </AppLayout>
+    );
+  }
+
+  const card = cards[index];
 
   return (
-    <div className={styles.page}>
-      <h1>Flashcards</h1>
+    <AppLayout>
+      <div className={styles.card} onClick={() => setShowBack(!showBack)}>
+        {showBack ? card.back : card.front}
+      </div>
 
-      {cards.length === 0 && <p>No flashcards yet.</p>}
+      <div className={styles.controls}>
+        <button
+          onClick={() => {
+            setIndex((i) => Math.max(i - 1, 0));
+            setShowBack(false);
+          }}
+        >
+          Prev
+        </button>
 
-      {cards.map((card) => (
-        <div key={card.id} className={styles.card}>
-          <strong>{card.question}</strong>
-          <p>{card.answer}</p>
-        </div>
-      ))}
-    </div>
+        <button
+          onClick={() => {
+            setIndex((i) => Math.min(i + 1, cards.length - 1));
+            setShowBack(false);
+          }}
+        >
+          Next
+        </button>
+      </div>
+    </AppLayout>
   );
 }

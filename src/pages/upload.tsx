@@ -1,67 +1,65 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-import styles from "../styles/Upload.module.css";
+import AppLayout from "@/components/layout/AppLayout";
+import styles from "@/styles/Upload.module.css";
 
 export default function UploadPage() {
-  const [notes, setNotes] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const router = useRouter();
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async () => {
-    if (!notes.trim()) {
-      setError("Please paste some notes first.");
-      return;
-    }
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) return;
 
     setLoading(true);
-    setError("");
+    setError(null);
 
     try {
+      const formData = new FormData();
+      formData.append("file", file);
+
       const res = await fetch("/api/processMaterials", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes }),
+        body: formData,
       });
 
-      if (!res.ok) throw new Error("Processing failed");
+      if (!res.ok) {
+        throw new Error("Upload failed");
+      }
 
-      const json = await res.json();
-
-      router.push({
-        pathname: "/results",
-        query: { sessionId: json.sessionId },
-      });
-    } catch {
+      const result: { sessionId: string } = await res.json();
+      router.push(`/results?sessionId=${result.sessionId}`);
+    } catch (err) {
       setError("Something went wrong. Please try again.");
-    } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
-    <div className={styles.page}>
-      <h1>Upload or Paste Your Notes</h1>
-      <p>Add your class notes and StudySmart will generate materials.</p>
+    <AppLayout>
+      <div className={styles.container}>
+        <h1>Upload Your Study Material</h1>
 
-      <textarea
-        id="notes"
-        name="notes"
-        className={styles.textarea}
-        placeholder="Paste your notes here..."
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-      />
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <input
+            id="file"
+            name="file"
+            type="file"
+            accept=".pdf,.txt,.doc,.docx"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            required
+          />
 
-      {error && <p className={styles.error}>{error}</p>}
+          <button type="submit" disabled={loading}>
+            {loading ? "Processing…" : "Upload & Generate"}
+          </button>
+        </form>
 
-      <button
-        className={styles.button}
-        onClick={handleSubmit}
-        disabled={loading}
-      >
-        {loading ? <span className={styles.spinner} /> : "Generate Study Materials"}
-      </button>
-    </div>
+        {loading && <div className={styles.spinner} />}
+        {error && <p className={styles.error}>{error}</p>}
+      </div>
+    </AppLayout>
   );
 }
