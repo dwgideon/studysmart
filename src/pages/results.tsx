@@ -1,40 +1,32 @@
 import { useEffect, useState } from "react";
-import styles from "../styles/Results.module.css";
-
-type Flashcard = {
-  question: string;
-  answer: string;
-};
+import { useRouter } from "next/router";
+import styles from "./Results.module.css";
 
 export default function ResultsPage() {
-  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  const router = useRouter();
+  const { sessionId } = router.query;
+
+  const [flashcards, setFlashcards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch("/api/processMaterials");
-        const json = await res.json();
-        setFlashcards(Array.isArray(json.flashcards) ? json.flashcards : []);
-      } catch {
-        setFlashcards([]);
-      } finally {
+    if (!sessionId) return;
+
+    fetch(`/api/getNotes?sessionId=${sessionId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setFlashcards(Array.isArray(data.flashcards) ? data.flashcards : []);
         setLoading(false);
-      }
-    }
-
-    load();
-  }, []);
-
-  if (loading) {
-    return <p className={styles.loading}>Loading results…</p>;
-  }
+      });
+  }, [sessionId]);
 
   return (
     <div className={styles.page}>
       <h1>Your Flashcards</h1>
 
-      {flashcards.length === 0 && (
+      {loading && <p>Loading…</p>}
+
+      {!loading && flashcards.length === 0 && (
         <p>No flashcards generated yet.</p>
       )}
 
