@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import styles from "../styles/Flashcards.module.css";
+import styles from './Flashcards.module.css';
 
 type Flashcard = {
   question: string;
