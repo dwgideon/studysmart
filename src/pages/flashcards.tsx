@@ -1,73 +1,72 @@
 import { useEffect, useState } from 'react';
-import styles from './Flashcards.module.css';
 
 export default function FlashcardsPage() {
   const [loading, setLoading] = useState(true);
-  const [progress, setProgress] = useState(5);
-  const [statusText, setStatusText] = useState('Preparing your session…');
-
+  const [progress, setProgress] = useState(10);
   const messages = [
-    'Preparing your session…',
-    'Analyzing your content…',
-    'Generating flashcards…',
-    'Organizing results…'
+    'Preparing your flashcards…',
+    'Analyzing your notes…',
+    'Generating questions…',
+    'Almost ready…',
   ];
+  const [i, setI] = useState(0);
 
-  // Fake-but-smooth progress bar
   useEffect(() => {
-    if (!loading) return;
+    const p = setInterval(() => {
+      setProgress(prev => (prev < 90 ? prev + Math.random() * 6 : prev));
+    }, 400);
 
-    const progressInterval = setInterval(() => {
-      setProgress(prev => (prev < 90 ? prev + Math.random() * 8 : prev));
-    }, 500);
+    const m = setInterval(() => {
+      setI(x => (x + 1) % messages.length);
+    }, 1800);
 
-    return () => clearInterval(progressInterval);
-  }, [loading]);
-
-  // Rotate status messages
-  useEffect(() => {
-    let index = 0;
-    const messageInterval = setInterval(() => {
-      index++;
-      if (index < messages.length) {
-        setStatusText(messages[index]);
-      }
-    }, 2000);
-
-    return () => clearInterval(messageInterval);
-  }, []);
-
-  // Simulate backend completion (REMOVE when wiring real data)
-  useEffect(() => {
-    const timer = setTimeout(() => {
+    // simulate backend work — replace with real logic
+    const done = setTimeout(() => {
       setProgress(100);
       setLoading(false);
-    }, 8000);
+    }, 5000);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearInterval(p);
+      clearInterval(m);
+      clearTimeout(done);
+    };
   }, []);
 
   if (loading) {
     return (
-      <div className={styles.loadingPage}>
-        <div className={styles.loadingCard}>
-          <p className={styles.status}>{statusText}</p>
+      <div style={{ padding: '4rem', color: 'white' }}>
+        <h2>{messages[i]}</h2>
 
-          <div className={styles.progressBar}>
-            <div
-              className={styles.progressFill}
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-
-          <p className={styles.subtle}>This usually takes less than a minute</p>
+        <div
+          style={{
+            marginTop: 16,
+            height: 8,
+            maxWidth: 400,
+            background: 'rgba(255,255,255,0.2)',
+            borderRadius: 4,
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              width: `${progress}%`,
+              height: '100%',
+              background: 'linear-gradient(90deg,#4f8cff,#7aa8ff)',
+              transition: 'width 0.4s ease',
+            }}
+          />
         </div>
+
+        <p style={{ marginTop: 12, fontSize: 12, opacity: 0.7 }}>
+          This usually takes less than a minute
+        </p>
       </div>
     );
   }
 
   return (
-    <div className={styles.page}>
+    <div style={{ padding: '4rem', color: 'white' }}>
       <h1>Your Flashcards</h1>
       {/* real flashcard UI goes here */}
     </div>
