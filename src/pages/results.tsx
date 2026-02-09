@@ -11,17 +11,33 @@ export default function ResultsPage() {
   const [flashcards, setFlashcards] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!router.isReady) return;
+    if (!sessionId) {
+      setLoading(false);
+      return;
+    }
 
     async function load() {
-      const res = await fetch(`/api/getFlashcards?sessionId=${sessionId}`);
-      const json = await res.json();
-      setFlashcards(json.flashcards || []);
-      setLoading(false);
+      try {
+        const res = await fetch(
+          `/api/getFlashcards?sessionId=${sessionId}`
+        );
+
+        if (!res.ok) {
+          throw new Error("Failed to fetch flashcards");
+        }
+
+        const json = await res.json();
+        setFlashcards(json.flashcards || []);
+      } catch (err) {
+        console.error("Error loading flashcards:", err);
+      } finally {
+        setLoading(false);
+      }
     }
 
     load();
-  }, [sessionId]);
+  }, [router.isReady, sessionId]);
 
   if (loading) {
     return <div className={styles.page}>Loading...</div>;
