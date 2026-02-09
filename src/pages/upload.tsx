@@ -15,25 +15,55 @@ export default function UploadPage() {
       return;
     }
 
+    console.log("UPLOAD START");
     setLoading(true);
 
     const formData = new FormData();
     if (text) formData.append("text", text);
     if (file) formData.append("file", file);
 
-    const res = await fetch("/api/processMaterials", {
-      method: "POST",
-      body: formData,
-    });
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => {
+        controller.abort();
+      }, 60000); // 60 second timeout protection
 
-    const result = await res.json();
+      const res = await fetch("/api/processMaterials", {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
+      });
 
-    setLoading(false);
+      clearTimeout(timeout);
 
-    if (result.sessionId) {
-      router.push(`/results?sessionId=${result.sessionId}`);
-    } else {
-      alert("Something went wrong generating materials.");
+      console.log("FETCH RETURNED", res.status);
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(
+          `Server error ${res.status}: ${errorText || "Unknown error"}`
+        );
+      }
+
+      const result = await res.json();
+      console.log("JSON PARSED", result);
+
+      if (result.sessionId) {
+        router.push(`/results?sessionId=${result.sessionId}`);
+      } else {
+        throw new Error("No sessionId returned from API.");
+      }
+    } catch (err: any) {
+      console.error("UPLOAD ERROR:", err);
+
+      if (err.name === "AbortError") {
+        alert("Upload timed out. Please try again.");
+      } else {
+        alert("Upload failed. Check console for details.");
+      }
+    } finally {
+      console.log("UPLOAD FINISHED");
+      setLoading(false);
     }
   }
 
