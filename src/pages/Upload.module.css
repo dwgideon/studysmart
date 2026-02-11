@@ -1,0 +1,78 @@
+.page {
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #0b1c36, #020617);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card {
+  background: white;
+  width: 100%;
+  max-width: 760px;
+  padding: 32px;
+  border-radius: 18px;
+}
+
+.card h1 {
+  margin-bottom: 6px;
+}
+
+.card p {
+  margin-bottom: 16px;
+  color: #555;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 220px;
+  padding: 16px;
+  font-size: 16px;
+  border-radius: 12px;
+  border: 1px solid #ccc;
+  resize: vertical;
+  color: #111;
+}
+
+.textarea::placeholder {
+  color: #888;
+}
+
+.fileRow {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fileLabel {
+  background: #eef2ff;
+  color: #1e3a8a;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.fileName {
+  font-size: 14px;
+  color: #333;
+}
+
+.button {
+  margin-top: 24px;
+  width: 100%;
+  padding: 14px;
+  font-size: 18px;
+  font-weight: 700;
+  color: white;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6366f1, #3b82f6);
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

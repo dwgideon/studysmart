@@ -1,21 +1,34 @@
-// pages/api/getQuizById.ts
+import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { NextApiRequest, NextApiResponse } from "next";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, authOptions);
-  if (!session?.user?.id) return res.status(401).end();
-
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   const { id } = req.query;
 
-  const quiz = await prisma.savedQuiz.findUnique({
-    where: { id: id as string },
-  });
+  if (!id || typeof id !== "string") {
+    return res.status(400).json({ error: "Missing or invalid quiz id" });
+  }
 
-  if (!quiz || quiz.userId !== session.user.id)
-    return res.status(403).json({ error: "Not authorized" });
+  try {
+    const topic = await prisma.topics.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        title: true,
+        quiz: true,
+        created_at: true,
+      },
+    });
 
-  res.status(200).json(quiz);
+    if (!topic || !topic.quiz) {
+      return res.status(404).json({ error: "Quiz not found" });
+    }
+
+    return res.status(200).json(topic);
+  } catch (error) {
+    console.error("getQuizById error:", error);
+    return res.status(500).json({ error: "Failed to fetch quiz" });
+  }
 }

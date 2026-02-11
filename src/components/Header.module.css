@@ -1,0 +1,60 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0.6rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logoWrap {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.logo {
+  max-height: 40px;
+  width: auto;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.navLink {
+  color: #1f2937;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.navLink:hover {
+  color: #4361ee;
+}
+
+.primaryBtn {
+  background: linear-gradient(135deg, #4361ee, #4cc9f0);
+  color: white;
+  padding: 0.5rem 0.95rem;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.primaryBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(67, 97, 238, 0.35);
+}

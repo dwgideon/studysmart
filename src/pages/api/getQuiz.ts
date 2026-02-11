@@ -11,10 +11,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!userId) return res.status(401).end();
 
   try {
-    const quizzes = await prisma.savedQuiz.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-    });
+    const quizzes = await prisma.topics.findMany({
+  where: { user_id: userId },
+  orderBy: { created_at: "desc" },
+  select: {
+    id: true,
+    title: true,
+    quiz: true,
+    created_at: true,
+  },
+});
+
 
     res.status(200).json(quizzes);
   } catch (error) {

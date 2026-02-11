@@ -1,30 +1,53 @@
 {
   "compilerOptions": {
-    "target": "es2020",
+    /* === Core Settings === */
+    "target": "ES2020",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "esModuleInterop": true,
+
+    /* === Module Resolution === */
     "module": "esnext",
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "esModuleInterop": true,
     "jsx": "preserve",
     "incremental": true,
+
+    /* === Path Aliases === */
     "baseUrl": ".",
-    "typeRoots": ["./src/types", "./node_modules/@types"],
     "paths": {
       "@/*": ["src/*"]
-    }
+    },
+
+    /* === Lint / Cleanup Helpers === */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": false,
+
+    /* === Type Checking Improvements === */
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowSyntheticDefaultImports": true
   },
+
+  /* === Project Structure === */
   "include": [
     "next-env.d.ts",
     "**/*.ts",
-    "**/*.tsx",
-    "src/types"
+    "**/*.tsx"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    ".next",
+    "out",
+    "dist",
+    "build",
+    "supabase"
+  ]
 }

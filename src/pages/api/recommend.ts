@@ -1,47 +1,31 @@
-// src/pages/api/recommend.ts
-import { NextApiRequest, NextApiResponse } from "next";
-import { prisma } from "@/lib/prisma";
-import { generateStudyRecommendation } from "@/lib/aiHelpers";
+import type { NextApiRequest, NextApiResponse } from 'next';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+type Recommendation = {
+  topic: string;
+  confidence: number;
+};
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+): Promise<void> {
+  if (req.method !== 'POST') {
+    res.status(405).end('Method Not Allowed');
+    return;
+  }
+
   try {
-    // Temporary: in production, get actual logged-in user from Supabase Auth
-    const userId = "test-user";
+    const { keywords }: { keywords: string[] } = req.body;
 
-    // Find the user's most recent activity (Note, Quiz, or Flashcard)
-    const [lastNote, lastQuiz, lastFlashcard] = await Promise.all([
-      prisma.note.findFirst({ where: { userId }, orderBy: { createdAt: "desc" } }),
-      prisma.quiz.findFirst({ where: { userId }, orderBy: { createdAt: "desc" } }),
-      prisma.flashcard.findFirst({ where: { userId }, orderBy: { createdAt: "desc" } }),
-    ]);
+    // Simulated recommendation logic
+    const recommendations: Recommendation[] = keywords.map((keyword, index) => ({
+      topic: `Recommended Topic for ${keyword}`,
+      confidence: Math.round((Math.random() * 10000) / (index + 1)) / 100,
+    }));
 
-    // Choose whichever was most recent
-    const recent = [lastNote, lastQuiz, lastFlashcard]
-      .filter(Boolean)
-      .sort(
-        (a: any, b: any) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )[0];
-
-    const topic =
-      recent && "title" in recent
-        ? recent.title
-        : recent && "front" in recent
-        ? recent.front
-        : null;
-
-    const recommendation = await generateStudyRecommendation(topic);
-
-    return res.status(200).json({
-      success: true,
-      topic: topic || "General Study",
-      recommendation,
-    });
-  } catch (err: any) {
-    console.error("AI recommend error:", err);
-    return res.status(500).json({
-      success: false,
-      error: err.message || "Failed to generate recommendation",
-    });
+    res.status(200).json({ recommendations });
+  } catch (err) {
+    const error = err as Error;
+    res.status(500).json({ error: error.message });
   }
 }

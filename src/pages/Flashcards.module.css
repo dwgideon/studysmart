@@ -1,0 +1,44 @@
+.loadingPage {
+  min-height: calc(100vh - 72px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #020617, #020b2a);
+}
+
+.loadingCard {
+  width: 100%;
+  max-width: 420px;
+  padding: 2.5rem;
+  text-align: center;
+  color: white;
+}
+
+.status {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.subtle {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.progressBar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #4f8cff, #7aa8ff);
+  transition: width 0.4s ease;
+}
+
+.page {
+  padding: 2rem;
+  color: white;
+}

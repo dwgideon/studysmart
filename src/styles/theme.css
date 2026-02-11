@@ -1,0 +1,22 @@
+:root {
+  /* Accent Gradient */
+  --accent-start: #4f46e5;
+  --accent-end: #38bdf8;
+
+  /* Backgrounds */
+  --bg-main: linear-gradient(180deg, #0b1020 0%, #0f172a 100%);
+  --bg-surface: rgba(255, 255, 255, 0.04);
+
+  /* Borders & Shadows */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.45);
+
+  /* Text */
+  --text-primary: #f9fafb;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+
+  /* Radius */
+  --radius-lg: 1rem;
+  --radius-md: 0.75rem;
+}

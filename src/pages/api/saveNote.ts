@@ -2,8 +2,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).end();
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== "POST") {
+    return res.status(405).end();
+  }
 
   const { title, content, userId } = req.body;
 
@@ -12,12 +17,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const note = await prisma.note.create({
-      data: { title, content, userId },
+    const note = await prisma.notes.create({
+      data: {
+        title,
+        content,
+        user_id: userId,
+      },
     });
-    res.status(200).json(note);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to save note" });
+
+    return res.status(200).json(note);
+  } catch (error) {
+    console.error("saveNote error:", error);
+    return res.status(500).json({ error: "Failed to save note" });
   }
 }
