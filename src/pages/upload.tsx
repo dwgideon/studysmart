@@ -1,6 +1,7 @@
 // src/pages/upload.tsx
 import { useState } from "react";
 import { useRouter } from "next/router";
+import { supabase } from "@/lib/supabaseClient";
 import styles from "./Upload.module.css";
 
 export default function UploadPage() {
@@ -18,15 +19,27 @@ export default function UploadPage() {
     console.log("UPLOAD START");
     setLoading(true);
 
-    const formData = new FormData();
-    if (text) formData.append("text", text);
-    if (file) formData.append("file", file);
-
     try {
+      // 🔐 Get logged-in user from Supabase
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        throw new Error("User not authenticated.");
+      }
+
+      const formData = new FormData();
+      formData.append("userId", user.id);
+
+      if (text) formData.append("text", text);
+      if (file) formData.append("file", file);
+
       const controller = new AbortController();
       const timeout = setTimeout(() => {
         controller.abort();
-      }, 60000); // 60 second timeout protection
+      }, 60000); // 60 seconds
 
       const res = await fetch("/api/processMaterials", {
         method: "POST",
@@ -59,7 +72,7 @@ export default function UploadPage() {
       if (err.name === "AbortError") {
         alert("Upload timed out. Please try again.");
       } else {
-        alert("Upload failed. Check console for details.");
+        alert(err.message || "Upload failed. Check console for details.");
       }
     } finally {
       console.log("UPLOAD FINISHED");

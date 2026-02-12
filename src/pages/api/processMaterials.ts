@@ -1,8 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { randomUUID } from "crypto";
-import formidable from "formidable";
-import { generateFlashcardsFromText } from "@/lib/aiHelpers";
 import { prisma } from "@/lib/prisma";
+import { generateFlashcardsFromText } from "@/lib/aiHelpers";
+import formidable from "formidable";
 
 export const config = {
   api: {
@@ -18,36 +17,50 @@ export default async function handler(
     return res.status(405).end();
   }
 
-  const sessionId = randomUUID();
+  const form = formidable();
 
-  const form = formidable({ multiples: false });
+  form.parse(req, async (err: any, fields: Record<string, any>) => {
+  if (err) {
+    console.error("Form parse error:", err);
+    return res.status(500).json({ error: "Failed to parse form" });
+  }
 
-  form.parse(req, async (err, fields) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: "File parse error" });
-    }
+  const content = fields.text;
+  const userId = fields.userId;
 
-    const content = fields.text as string;
+  if (!content || !userId) {
+    return res.status(400).json({ error: "Missing content or userId" });
+  }
 
-    if (!content) {
-      return res.status(400).json({ error: "No content provided" });
-    }
+  // continue logic...
+});
+
 
     try {
+      // 1️⃣ Create Study Session
+      const session = await prisma.studySession.create({
+        data: {
+          userId,
+        },
+      });
+
+      // 2️⃣ Generate Flashcards
       const flashcards = await generateFlashcardsFromText(content);
 
+      // 3️⃣ Save Flashcards linked to session
       await prisma.flashcard.createMany({
-        data: flashcards.map((card) => ({
+        data: flashcards.map((card: any) => ({
           question: card.front,
           answer: card.back,
-          session_id: sessionId, // 🔥 IMPORTANT
+          userId,
+          sessionId: session.id,
         })),
       });
 
-      return res.status(200).json({ sessionId });
+      // 4️⃣ Return sessionId
+      return res.status(200).json({ sessionId: session.id });
     } catch (error) {
-      console.error(error);
+      console.error("Generation error:", error);
       return res.status(500).json({ error: "Generation failed" });
     }
   });

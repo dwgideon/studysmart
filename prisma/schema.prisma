@@ -3,174 +3,46 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-  schemas   = ["public", "auth"]
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-/**
- * =========================
- * FLASHCARDS
- * =========================
- */
+//////////////////////////////////////////////////////////
+// PUBLIC APP MODELS
+//////////////////////////////////////////////////////////
+
+model User {
+  id        String      @id @db.Uuid
+  email     String      @unique
+  name      String?
+  createdAt DateTime    @default(now())
+
+  flashcards Flashcard[]
+  sessions   StudySession[]
+}
+
+model StudySession {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @db.Uuid
+  createdAt  DateTime @default(now())
+  totalCards Int      @default(0)
+
+  user       User        @relation(fields: [userId], references: [id])
+  flashcards Flashcard[]
+}
+
 model Flashcard {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id          String?  @db.Uuid
-  topic_id         String?  @db.Uuid
-  study_session_id String?  @db.Uuid   // 🔥 NEW LINK TO SESSION
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  sessionId String   @db.Uuid
 
-  question   String
-  answer     String
-  created_at DateTime @default(now()) @db.Timestamp(6)
-
-  mastery       Float     @default(0)
-  times_seen    Int       @default(0)
-  times_correct Int       @default(0)
-  avg_time      Float     @default(0)
-  last_seen_at  DateTime?
-
-  topic         topics?         @relation(fields: [topic_id], references: [id])
-  studySession  study_sessions? @relation(fields: [study_session_id], references: [id])
-  reviews       CardReview[]
-
-  @@index([study_session_id])
-  @@schema("public")
-}
-
-/**
- * =========================
- * STUDY SESSIONS
- * =========================
- */
-model study_sessions {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id      String?
-  total_cards  Int       @default(0)
-  correct      Int       @default(0)
-  incorrect    Int       @default(0)
-  started_at   DateTime  @default(now()) @db.Timestamptz(6)
-  completed_at DateTime?
-
-  flashcards Flashcard[]
-  reviews    CardReview[]
-
-  @@schema("public")
-}
-
-/**
- * =========================
- * CARD REVIEWS
- * =========================
- */
-model CardReview {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  flashcard_id String   @db.Uuid
-  session_id   String   @db.Uuid
-  correct      Boolean
-  reviewed_at  DateTime @default(now()) @db.Timestamptz(6)
-
-  flashcard Flashcard      @relation(fields: [flashcard_id], references: [id])
-  session   study_sessions @relation(fields: [session_id], references: [id])
-
-  @@map("card_reviews")
-  @@schema("public")
-}
-
-/**
- * =========================
- * STUDY STREAKS
- * =========================
- */
-model study_streaks {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id         String?
-  current_streak  Int       @default(0)
-  longest_streak  Int       @default(0)
-  last_study_date DateTime?
-
-  @@schema("public")
-}
-
-/**
- * =========================
- * LEADERBOARD
- * =========================
- */
-model leaderboard {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id    String?
-  username   String?
-  score      Int      @default(0)
-  created_at DateTime @default(now()) @db.Timestamp(6)
-
-  @@schema("public")
-}
-
-/**
- * =========================
- * TOPICS
- * =========================
- */
-model topics {
-  id         String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  user_id    String?  @db.Uuid
-  title      String?
-  image_url  String?
-  quiz       String?
-  summary    String?
-  created_at DateTime @default(now()) @db.Timestamp(6)
-
-  flashcards Flashcard[]
-
-  @@schema("public")
-}
-
-/**
- * =========================
- * NOTES
- * =========================
- */
-model notes {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id    String?
-  title      String?
-  content    String?
-  created_at DateTime @default(now()) @db.Timestamp(6)
-
-  @@schema("public")
-}
-
-/**
- * =========================
- * USAGE TRACKING
- * =========================
- */
-model usage {
-  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId     String
-  month      String
-  tokensUsed Int    @default(0)
-
-  @@unique([userId, month])
-  @@schema("public")
-}
-
-/**
- * =========================
- * SAVED QUIZZES
- * =========================
- */
-model savedQuiz {
-  id        String   @id @default(uuid())
-  userId    String
-  topic     String
-  type      String
-  questions Json
-  answers   Json
-  score     Int?
+  question  String
+  answer    String
   createdAt DateTime @default(now())
 
+  user     User         @relation(fields: [userId], references: [id])
+  session  StudySession @relation(fields: [sessionId], references: [id])
+
   @@index([userId])
-  @@schema("public")
+  @@index([sessionId])
 }

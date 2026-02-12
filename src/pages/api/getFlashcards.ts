@@ -11,14 +11,19 @@ export default async function handler(
     return res.status(400).json({ error: "Missing sessionId" });
   }
 
-  const cards = await prisma.flashcard.findMany({
-    where: {
-      session_id: sessionId as string,
-    },
-    orderBy: {
-      created_at: "desc",
-    },
-  });
+  try {
+    const cards = await prisma.flashcard.findMany({
+      where: {
+        sessionId: sessionId as string,
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
 
-  res.status(200).json({ flashcards: cards });
+    return res.status(200).json({ flashcards: cards });
+  } catch (error) {
+    console.error("Fetch error:", error);
+    return res.status(500).json({ error: "Failed to fetch flashcards" });
+  }
 }
