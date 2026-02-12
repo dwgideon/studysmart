@@ -39,23 +39,20 @@ export default async function handler(
     try {
       // 1️⃣ Create Study Session
       const session = await prisma.studySession.create({
-        data: {
-          userId,
-        },
-      });
+  data: {
+    userId,
+  },
+});
 
-      // 2️⃣ Generate Flashcards
-      const flashcards = await generateFlashcardsFromText(content);
+await prisma.flashcard.createMany({
+  data: flashcards.map((card: any) => ({
+    question: card.front,
+    answer: card.back,
+    userId,
+    sessionId: session.id,
+  })),
+});
 
-      // 3️⃣ Save Flashcards linked to session
-      await prisma.flashcard.createMany({
-        data: flashcards.map((card: any) => ({
-          question: card.front,
-          answer: card.back,
-          userId,
-          sessionId: session.id,
-        })),
-      });
 
       // 4️⃣ Return sessionId
       return res.status(200).json({ sessionId: session.id });

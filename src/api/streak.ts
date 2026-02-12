@@ -5,16 +5,21 @@ export default async function handler(
   _req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // TEMP: replace later with real auth user
+  // TODO: Replace with real authenticated user
   const userId = "demo-user";
 
-  const streak = await prisma.study_streaks.findFirst({
-    where: { user_id: userId },
-  });
+  try {
+    const streak = await prisma.studyStreak.findUnique({
+      where: { userId },
+    });
 
-  return res.status(200).json({
-    currentStreak: streak?.current_streak ?? 0,
-    longestStreak: streak?.longest_streak ?? 0,
-    lastStudyDate: streak?.last_study_date ?? null,
-  });
+    return res.status(200).json({
+      currentStreak: streak?.currentStreak ?? 0,
+      longestStreak: streak?.longestStreak ?? 0,
+      lastStudyDate: streak?.lastStudyDate ?? null,
+    });
+  } catch (error) {
+    console.error("Streak fetch error:", error);
+    return res.status(500).json({ error: "Failed to fetch streak" });
+  }
 }
