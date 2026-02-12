@@ -1,25 +1,36 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
 
-export default async function handler(
-  _req: NextApiRequest,
-  res: NextApiResponse
-) {
-  // TODO: Replace with real authenticated user
-  const userId = "demo-user";
+/**
+ * Calculate current study streak
+ */
+export async function getStudyStreak(userId: string): Promise<number> {
+  const sessions = await prisma.studySession.findMany({
+    where: { userId },
+    select: { createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
 
-  try {
-    const streak = await prisma.studyStreak.findUnique({
-      where: { userId },
-    });
+  if (sessions.length === 0) return 0;
 
-    return res.status(200).json({
-      currentStreak: streak?.currentStreak ?? 0,
-      longestStreak: streak?.longestStreak ?? 0,
-      lastStudyDate: streak?.lastStudyDate ?? null,
-    });
-  } catch (error) {
-    console.error("Streak fetch error:", error);
-    return res.status(500).json({ error: "Failed to fetch streak" });
+  let streak = 0;
+  let currentDate = new Date();
+
+  for (const session of sessions) {
+    const sessionDate = new Date(session.createdAt);
+
+    const diff =
+      Math.floor(
+        (currentDate.getTime() - sessionDate.getTime()) /
+          (1000 * 60 * 60 * 24)
+      );
+
+    if (diff === 0 || diff === 1) {
+      streak++;
+      currentDate = sessionDate;
+    } else {
+      break;
+    }
   }
+
+  return streak;
 }
