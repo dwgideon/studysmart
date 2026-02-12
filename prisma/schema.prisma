@@ -19,17 +19,34 @@ model User {
 
   flashcards Flashcard[]
   sessions   StudySession[]
+  streak     StudyStreak?
+
+  @@index([email])
 }
+
+//////////////////////////////////////////////////////////
+// STUDY SESSIONS
+//////////////////////////////////////////////////////////
 
 model StudySession {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId     String   @db.Uuid
   createdAt  DateTime @default(now())
   totalCards Int      @default(0)
+  correct    Int      @default(0)
+  incorrect  Int      @default(0)
+  completed  Boolean  @default(false)
 
-  user       User        @relation(fields: [userId], references: [id])
+  user       User         @relation(fields: [userId], references: [id])
   flashcards Flashcard[]
+
+  @@index([userId])
+  @@index([createdAt])
 }
+
+//////////////////////////////////////////////////////////
+// FLASHCARDS
+//////////////////////////////////////////////////////////
 
 model Flashcard {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -40,9 +57,25 @@ model Flashcard {
   answer    String
   createdAt DateTime @default(now())
 
-  user     User         @relation(fields: [userId], references: [id])
-  session  StudySession @relation(fields: [sessionId], references: [id])
+  user    User         @relation(fields: [userId], references: [id])
+  session StudySession @relation(fields: [sessionId], references: [id])
 
   @@index([userId])
   @@index([sessionId])
+}
+
+//////////////////////////////////////////////////////////
+// STUDY STREAKS
+//////////////////////////////////////////////////////////
+
+model StudyStreak {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @unique @db.Uuid
+  currentStreak  Int      @default(0)
+  longestStreak  Int      @default(0)
+  lastStudyDate  DateTime?
+
+  user           User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
