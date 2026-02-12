@@ -14,10 +14,10 @@ export default async function handler(
   try {
     const cards = await prisma.flashcard.findMany({
       where: {
-        sessionId: sessionId as string,
+        sessionId: sessionId as string,   // ✅ camelCase
       },
       orderBy: {
-        createdAt: "asc",
+        createdAt: "asc",                 // ✅ camelCase
       },
     });
 
