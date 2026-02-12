@@ -15,9 +15,11 @@ datasource db {
  * =========================
  */
 model Flashcard {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id    String?  @db.Uuid
-  topic_id   String?  @db.Uuid
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id          String?  @db.Uuid
+  topic_id         String?  @db.Uuid
+  study_session_id String?  @db.Uuid   // 🔥 NEW LINK TO SESSION
+
   question   String
   answer     String
   created_at DateTime @default(now()) @db.Timestamp(6)
@@ -28,9 +30,11 @@ model Flashcard {
   avg_time      Float     @default(0)
   last_seen_at  DateTime?
 
-  topic   topics?      @relation(fields: [topic_id], references: [id])
-  reviews CardReview[]
+  topic         topics?         @relation(fields: [topic_id], references: [id])
+  studySession  study_sessions? @relation(fields: [study_session_id], references: [id])
+  reviews       CardReview[]
 
+  @@index([study_session_id])
   @@schema("public")
 }
 
@@ -42,13 +46,14 @@ model Flashcard {
 model study_sessions {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id      String?
-  total_cards  Int
-  correct      Int
-  incorrect    Int
+  total_cards  Int       @default(0)
+  correct      Int       @default(0)
+  incorrect    Int       @default(0)
   started_at   DateTime  @default(now()) @db.Timestamptz(6)
   completed_at DateTime?
 
-  reviews CardReview[]
+  flashcards Flashcard[]
+  reviews    CardReview[]
 
   @@schema("public")
 }
@@ -159,7 +164,7 @@ model usage {
 model savedQuiz {
   id        String   @id @default(uuid())
   userId    String
-  topic     String        // ✅ MUST BE HERE
+  topic     String
   type      String
   questions Json
   answers   Json
