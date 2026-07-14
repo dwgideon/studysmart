@@ -63,6 +63,8 @@ All AI input and output passes local rules plus OpenAI moderation. Prohibited le
 
 Help-seeking disclosures, self-harm concerns, abuse disclosures, personal-information mistakes, and legitimate age-appropriate health or biology education are handled through protective guidance and do not create disciplinary strikes. Learner searches that indicate self-harm intent or seek ways to die create an urgent, guardian-only in-app alert with the exact request encrypted at rest; they never increase the learner's strike count or trigger a lockout.
 
+Safety alerts attempt delivery immediately when the event is created. The Vercel Hobby cron runs once daily as a fallback for failed deliveries and unacknowledged-alert processing; production deployments requiring 10- and 30-minute reminder escalation must use a Pro-grade scheduler or an equivalent external worker.
+
 ## Production launch gates
 
 The application includes technical controls and automated checks, but it does not self-certify legal or standards compliance. Before serving children in production, complete every gate in [docs/LAUNCH_SECURITY_CHECKLIST.md](docs/LAUNCH_SECURITY_CHECKLIST.md), including an independent penetration test, WCAG 2.2 audit, privacy/legal review, incident-response exercise, and any required 1EdTech certification.

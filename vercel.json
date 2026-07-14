@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/safety-delivery",
-      "schedule": "* * * * *"
+      "schedule": "0 1 * * *"
     },
     {
       "path": "/api/cron/ai-evaluation",
