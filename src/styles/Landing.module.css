@@ -5,7 +5,7 @@
 .systemBadge, .kicker { color:var(--blue-300); font-size:.68rem; font-weight:850; letter-spacing:.18em; text-transform:uppercase; }
 .systemBadge { align-items:center; display:inline-flex; gap:.65rem; }
 .systemBadge span { animation:breathe 2s infinite; background:#22d3ee; border-radius:50%; box-shadow:0 0 15px #22d3ee; height:7px; width:7px; }
-.hero h1 { font-size:clamp(3.2rem,7vw,6.65rem); font-weight:680; letter-spacing:-.07em; line-height:.88; margin:1.5rem 0 1.65rem; max-width:800px; }
+.hero h1 { font-size:clamp(3.2rem,7vw,6.65rem); font-kerning:normal; font-weight:680; letter-spacing:-.04em; line-height:.92; margin:1.5rem 0 1.65rem; max-width:820px; word-spacing:.015em; }
 .hero h1 em, .cta h2 em { background:linear-gradient(100deg,#68b6ff,#28e1f2); background-clip:text; color:transparent; font-style:normal; }
 .subtitle { color:var(--text-secondary); font-size:clamp(1.02rem,1.5vw,1.2rem); line-height:1.72; max-width:650px; }
 .heroActions { display:flex; flex-wrap:wrap; gap:.8rem; margin:2.2rem 0; }
