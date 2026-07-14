@@ -1,27 +1,27 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireApiUser } from "@/lib/auth";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const session = await getServerSession(req, res, authOptions);
+  if (req.method !== "GET") {return res.status(405).end();}
 
-  if (!session?.user?.id) {
-    return res.status(401).end();
-  }
+  const user = await requireApiUser(req, res);
+  if (!user) {return;}
 
   try {
-    const quizzes = await prisma.topics.findMany({
-      where: { user_id: session.user.id },
-      orderBy: { created_at: "desc" },
+    const quizzes = await prisma.savedQuiz.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
       select: {
         id: true,
         title: true,
-        quiz: true,
-        created_at: true,
+        source: true,
+        score: true,
+        total: true,
+        createdAt: true,
       },
     });
 

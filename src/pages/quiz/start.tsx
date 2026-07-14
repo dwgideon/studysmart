@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import AppLayout from "../../components/layout/AppLayout";
 
 type Question = {
   id: string;
@@ -36,7 +35,7 @@ export default function QuizStartPage() {
   }, []);
 
   return (
-    <AppLayout>
+    <div>
       <section style={{ maxWidth: 800, margin: "2rem auto" }}>
         <h1>Quiz</h1>
 
@@ -58,6 +57,6 @@ export default function QuizStartPage() {
             </div>
           ))}
       </section>
-    </AppLayout>
+    </div>
   );
 }

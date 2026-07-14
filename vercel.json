@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/safety-delivery",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/ai-evaluation",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/data-retention",
+      "schedule": "30 4 * * *"
+    }
+  ]
+}

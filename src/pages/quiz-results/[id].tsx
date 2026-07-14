@@ -1,71 +1,84 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import AppLayout from "../../components/layout/AppLayout";
-import layout from "../../styles/layout.module.css";
+import RequireAuth from "../../components/RequireAuth";
+import Link from "next/link";
 
-type TopicData = {
+type SavedQuiz = {
+  id: string;
   title: string;
-  description: string;
-  lessons: string[];
+  questions: Array<{
+    question: string;
+    options?: Record<string, string>;
+    answer: string;
+    explanation?: string;
+  }>;
+  score: number | null;
+  total: number | null;
+  createdAt: string;
 };
 
-export default function TopicPage() {
+export default function QuizResultPage() {
+  return (
+    <RequireAuth>
+      <QuizResultContent />
+    </RequireAuth>
+  );
+}
+
+function QuizResultContent() {
   const router = useRouter();
   const { id } = router.query;
-
-  const [topic, setTopic] = useState<TopicData | null>(null);
+  const [quiz, setQuiz] = useState<SavedQuiz | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || typeof id !== "string") {return;}
 
-    const loadTopic = async () => {
-      try {
-        // 🔧 placeholder — later this will come from DB
-        setTopic({
-          title: String(id).replace(/-/g, " "),
-          description:
-            "This topic will help you master key concepts through guided practice, quizzes, and flashcards.",
-          lessons: [
-            "Introduction and Key Terms",
-            "Worked Examples",
-            "Practice Problems",
-            "Quiz Review",
-          ],
-        });
-      } catch (err) {
-        console.error("Failed to load topic", err);
-      } finally {
+    fetch(`/api/getQuizById?id=${id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) {setQuiz(null);}
+        else {setQuiz(data);}
         setLoading(false);
-      }
-    };
-
-    loadTopic();
+      })
+      .catch(() => setLoading(false));
   }, [id]);
 
-  return (
-    <AppLayout>
-      <section className={layout.card}>
-        {loading ? (
-          <p>Loading topic…</p>
-        ) : !topic ? (
-          <p>Topic not found.</p>
-        ) : (
-          <>
-            <h1 style={{ marginBottom: "0.5rem" }}>{topic.title}</h1>
-            <p style={{ opacity: 0.8, marginBottom: "1.25rem" }}>
-              {topic.description}
-            </p>
+  if (loading) {return <Wrap>Loading…</Wrap>;}
+  if (!quiz) {return <Wrap>Quiz not found.</Wrap>;}
 
-            <h3>What you’ll cover:</h3>
-            <ul style={{ marginTop: "0.5rem" }}>
-              {topic.lessons.map((l, i) => (
-                <li key={i}>{l}</li>
-              ))}
-            </ul>
-          </>
-        )}
-      </section>
-    </AppLayout>
+  return (
+    <Wrap>
+      <h1>{quiz.title}</h1>
+      <p>
+        Score: {quiz.score ?? "—"} / {quiz.total ?? quiz.questions?.length ?? "—"}
+      </p>
+      <p style={{ color: "var(--text-muted)", marginBottom: 24 }}>
+        {new Date(quiz.createdAt).toLocaleString()}
+      </p>
+
+      <ol>
+        {(quiz.questions as SavedQuiz["questions"]).map((q, i) => (
+          <li key={i} style={{ marginBottom: 16 }}>
+            <strong>{q.question}</strong>
+            {q.explanation && (
+              <p style={{ fontSize: 14, color: "#64748b" }}>{q.explanation}</p>
+            )}
+          </li>
+        ))}
+      </ol>
+
+      <Link href="/quizzes" style={{ color: "#4f46e5" }}>
+        ← All quizzes
+      </Link>
+    </Wrap>
+  );
+}
+
+function Wrap({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ maxWidth: 720, margin: "2rem auto", padding: "0 1rem" }}>
+      {children}
+    </div>
   );
 }

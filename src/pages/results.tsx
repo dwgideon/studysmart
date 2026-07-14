@@ -3,15 +3,21 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import styles from "./Results.module.css";
 
+type Flashcard = {
+  id: string;
+  question: string;
+  answer: string;
+};
+
 export default function ResultsPage() {
   const router = useRouter();
   const { sessionId } = router.query;
 
   const [loading, setLoading] = useState(true);
-  const [flashcards, setFlashcards] = useState<any[]>([]);
+  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
 
   useEffect(() => {
-    if (!router.isReady) return;
+    if (!router.isReady) {return;}
     if (!sessionId) {
       setLoading(false);
       return;
@@ -50,14 +56,30 @@ export default function ResultsPage() {
       {flashcards.length === 0 ? (
         <p>No flashcards generated yet.</p>
       ) : (
-        <button
-          className={styles.button}
-          onClick={() =>
-            router.push(`/flashcards?sessionId=${sessionId}`)
-          }
-        >
-          View Flashcards
-        </button>
+        <div className={styles.actions}>
+          <button
+            className={styles.button}
+            onClick={() =>
+              router.push(`/flashcards?sessionId=${sessionId}`)
+            }
+          >
+            View flashcards
+          </button>
+          <button
+            className={styles.button}
+            onClick={() =>
+              router.push(`/quiz?sessionId=${sessionId}`)
+            }
+          >
+            Take quiz
+          </button>
+          <button
+            className={styles.button}
+            onClick={() => router.push("/study")}
+          >
+            Study session
+          </button>
+        </div>
       )}
     </div>
   );

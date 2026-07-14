@@ -1,45 +1,27 @@
-// src/pages/api/xp.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { prisma } from "@/lib/prisma";
-
-const DEMO_USER_ID = "demo-user"; // replace with auth later
+import { requireApiUser, getApiUser } from "@/lib/auth";
+import { awardXp, getUserXp } from "@/lib/xp";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method === "GET") {
-    const record = await prisma.leaderboard.findFirst({
-      where: { user_id: DEMO_USER_ID },
-    });
-
-    return res.json({ xp: record?.score ?? 0 });
+    const user = await getApiUser(req, res);
+    if (!user) {
+      return res.json({ xp: 0, level: 1 });
+    }
+    const xp = await getUserXp(user.id);
+    return res.json({ xp, level: Math.floor(xp / 100) + 1 });
   }
 
   if (req.method === "POST") {
-    const { amount } = req.body;
+    const user = await requireApiUser(req, res);
+    if (!user) {return;}
 
-    const existing = await prisma.leaderboard.findFirst({
-      where: { user_id: DEMO_USER_ID },
-    });
-
-    if (existing) {
-      await prisma.leaderboard.update({
-        where: { id: existing.id }, // ✅ unique
-        data: {
-          score: { increment: amount },
-        },
-      });
-    } else {
-      await prisma.leaderboard.create({
-        data: {
-          user_id: DEMO_USER_ID,
-          score: amount,
-        },
-      });
-    }
-
-    return res.status(200).json({ ok: true });
+    const { amount } = req.body as { amount?: number };
+    const xp = await awardXp(user.id, amount ?? 0);
+    return res.status(200).json({ ok: true, xp, level: Math.floor(xp / 100) + 1 });
   }
 
   res.status(405).end();

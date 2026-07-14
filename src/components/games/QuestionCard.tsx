@@ -1,1 +1,0 @@
-export default function QuestionCard(){ return <div>Question placeholder</div> }

@@ -1,74 +1,177 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import Link from "next/link";
+import RequireAuth from "../components/RequireAuth";
+
+type Flashcard = {
+  id: string;
+  question: string;
+  answer: string;
+};
 
 export default function FlashcardsPage() {
+  return (
+    <RequireAuth>
+      <FlashcardsContent />
+    </RequireAuth>
+  );
+}
+
+function FlashcardsContent() {
+  const router = useRouter();
+  const { sessionId } = router.query;
+  const [cards, setCards] = useState<Flashcard[]>([]);
+  const [index, setIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [progress, setProgress] = useState(10);
-  const messages = [
-    'Preparing your flashcards…',
-    'Analyzing your notes…',
-    'Generating questions…',
-    'Almost ready…',
-  ];
-  const [i, setI] = useState(0);
 
   useEffect(() => {
-    const p = setInterval(() => {
-      setProgress(prev => (prev < 90 ? prev + Math.random() * 6 : prev));
-    }, 400);
-
-    const m = setInterval(() => {
-      setI(x => (x + 1) % messages.length);
-    }, 1800);
-
-    // simulate backend work — replace with real logic
-    const done = setTimeout(() => {
-      setProgress(100);
+    if (!router.isReady) {return;}
+    if (!sessionId || typeof sessionId !== "string") {
       setLoading(false);
-    }, 5000);
+      return;
+    }
 
-    return () => {
-      clearInterval(p);
-      clearInterval(m);
-      clearTimeout(done);
-    };
-  }, []);
+    fetch(`/api/getFlashcards?sessionId=${sessionId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setCards(d.flashcards ?? []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [router.isReady, sessionId]);
 
   if (loading) {
+    return <PageWrap>Loading flashcards…</PageWrap>;
+  }
+
+  if (!sessionId) {
     return (
-      <div style={{ padding: '4rem', color: 'white' }}>
-        <h2>{messages[i]}</h2>
-
-        <div
-          style={{
-            marginTop: 16,
-            height: 8,
-            maxWidth: 400,
-            background: 'rgba(255,255,255,0.2)',
-            borderRadius: 4,
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              width: `${progress}%`,
-              height: '100%',
-              background: 'linear-gradient(90deg,#4f8cff,#7aa8ff)',
-              transition: 'width 0.4s ease',
-            }}
-          />
-        </div>
-
-        <p style={{ marginTop: 12, fontSize: 12, opacity: 0.7 }}>
-          This usually takes less than a minute
-        </p>
-      </div>
+      <PageWrap>
+        <p>Missing session. Generate cards from upload first.</p>
+        <Link href="/upload">Upload notes</Link>
+      </PageWrap>
     );
   }
 
+  if (!cards.length) {
+    return (
+      <PageWrap>
+        <p>No flashcards in this session.</p>
+        <Link href="/upload">Upload again</Link>
+      </PageWrap>
+    );
+  }
+
+  const card = cards[index];
+
   return (
-    <div style={{ padding: '4rem', color: 'white' }}>
-      <h1>Your Flashcards</h1>
-      {/* real flashcard UI goes here */}
+    <PageWrap>
+      <p style={{ marginBottom: 12 }}>
+        Card {index + 1} of {cards.length}
+      </p>
+      <CardBox onClick={() => setFlipped(!flipped)}>
+        <p style={{ fontSize: "1.35rem", fontWeight: 600 }}>
+          {flipped ? card.answer : card.question}
+        </p>
+        <p style={{ fontSize: 12, opacity: 0.6, marginTop: 12 }}>
+          Tap to flip
+        </p>
+      </CardBox>
+      <NavRow>
+        <button
+          type="button"
+          disabled={index === 0}
+          onClick={() => {
+            setIndex((i) => i - 1);
+            setFlipped(false);
+          }}
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          disabled={index >= cards.length - 1}
+          onClick={() => {
+            setIndex((i) => i + 1);
+            setFlipped(false);
+          }}
+        >
+          Next
+        </button>
+      </NavRow>
+      <div style={{ marginTop: 24, display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <Link
+          href={`/study`}
+          className="practice-button"
+        >
+          Study session
+        </Link>
+        <Link href={`/quiz?sessionId=${sessionId}`} className="practice-button">
+          Quiz this set
+        </Link>
+        <Link href="/dashboard" className="practice-button">
+          Dashboard
+        </Link>
+      </div>
+    </PageWrap>
+  );
+}
+
+function PageWrap({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="practice-page" style={{ maxWidth: 680 }}>
+      <h1 style={{ marginBottom: "1rem" }}>Your flashcards</h1>
+      {children}
+    </div>
+  );
+}
+
+function CardBox({
+  children,
+  onClick,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === "Enter" && onClick()}
+      style={{
+        background: "radial-gradient(circle at 50% 30%, rgba(37,99,235,.32), transparent 55%), linear-gradient(145deg, rgba(13,42,85,.9), rgba(4,16,36,.96))",
+        color: "#fff",
+        padding: 40,
+        border: "1px solid rgba(125,211,252,.2)",
+        borderRadius: 24,
+        boxShadow: "var(--shadow-soft)",
+        minHeight: 300,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        cursor: "pointer",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function NavRow({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        marginTop: 16,
+        gap: 8,
+      }}
+    >
+      {children}
     </div>
   );
 }

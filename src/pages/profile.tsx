@@ -1,123 +1,109 @@
-import Sidebar from "../components/Sidebar";
+import { useEffect, useState } from "react";
+import Head from "next/head";
 import { useUser } from "@supabase/auth-helpers-react";
-import { useState } from "react";
+import RequireAuth from "@/components/RequireAuth";
+import LearningContextForm from "@/components/LearningContextForm";
+import styles from "./Profile.module.css";
 
-/* ---------- Types ---------- */
-
-type UserStats = {
+type ProfileStats = {
   sessions: number;
-  sessionChange: number;
   flashcards: number;
-  flashcardChange: number;
   quizzes: number;
-  quizChange: number;
+  xp: number;
+  level: number;
   mastery: number;
-  masteryChange: number;
+  streak: { currentStreak: number; longestStreak: number };
+  activity: Array<{ title: string; subtitle: string; time: string }>;
 };
-
-type ActivityItem = {
-  title: string;
-  subtitle: string;
-  time: string;
-};
-
-type StatCard = {
-  label: string;
-  value: string | number;
-  change: number;
-  icon: string;
-};
-
-/* ---------- Component ---------- */
 
 export default function ProfilePage() {
+  return (
+    <RequireAuth>
+      <ProfileContent />
+    </RequireAuth>
+  );
+}
+
+function ProfileContent() {
   const user = useUser();
+  const [stats, setStats] = useState<ProfileStats | null>(null);
 
-  const [userStats] = useState<UserStats>({
-    sessions: 24,
-    sessionChange: 12,
-    flashcards: 156,
-    flashcardChange: 8,
-    quizzes: 18,
-    quizChange: -3,
-    mastery: 78,
-    masteryChange: 5,
-  });
-
-  const [activity] = useState<ActivityItem[]>([
-    { title: "Completed Flashcard Review", subtitle: "Biology - Cell Structure", time: "2h ago" },
-    { title: "Quiz Attempted", subtitle: "Trigonometry Basics", time: "1 day ago" },
-  ]);
-
-  const statCards: StatCard[] = [
-    { label: "Study Sessions", value: userStats.sessions, change: userStats.sessionChange, icon: "🕒" },
-    { label: "Flashcards", value: userStats.flashcards, change: userStats.flashcardChange, icon: "📚" },
-    { label: "Quizzes Taken", value: userStats.quizzes, change: userStats.quizChange, icon: "❓" },
-    { label: "Mastery Level", value: `${userStats.mastery}%`, change: userStats.masteryChange, icon: "⭐" },
-  ];
+  useEffect(() => {
+    fetch("/api/profile/stats")
+      .then((response) => response.json())
+      .then(setStats)
+      .catch(() => setStats(null));
+  }, []);
 
   const displayName =
-    (user as any)?.user_metadata?.name ||
-    (user as any)?.email ||
-    "Alex";
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "Student";
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar />
-
-      <main className="flex-1 p-8">
-        <h2 className="text-2xl font-semibold mb-1">
-          Welcome back, {displayName}
-        </h2>
-
-        <p className="text-gray-600 mb-6">
-          Here's your personalized learning dashboard powered by AI.
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          {statCards.map((stat, i) => (
-            <div key={i} className="bg-white rounded-lg p-6 shadow">
-              <div className="text-gray-500 text-sm mb-1">{stat.label}</div>
-
-              <div className="text-2xl font-semibold">
-                {stat.icon} {stat.value}
-              </div>
-
-              <div
-                className={`text-sm mt-1 ${
-                  stat.change >= 0 ? "text-green-600" : "text-red-500"
-                }`}
-              >
-                {stat.change >= 0 ? "+" : ""}
-                {stat.change}% from last week
-              </div>
+    <>
+      <Head><title>Your profile · StudySmart</title></Head>
+      <div className={styles.page}>
+        <div className={styles.container}>
+          <header className={styles.header}>
+            <div>
+              <p className={styles.eyebrow}>Learner profile</p>
+              <h1>Welcome back, {displayName}</h1>
+              <p>Manage your learning context and see your progress in one place.</p>
             </div>
-          ))}
-        </div>
+            <div className={styles.streak} aria-label={`${stats?.streak.currentStreak ?? 0} day study streak`}>
+              <span aria-hidden="true">🔥</span>
+              <strong>{stats?.streak.currentStreak ?? 0}</strong>
+              <small>day streak</small>
+            </div>
+          </header>
 
-        <div className="mb-10">
-          <h3 className="text-lg font-semibold mb-3">Recent Activity</h3>
+          <section className={styles.stats} aria-label="Learning statistics">
+            <Stat label="Study sessions" value={stats?.sessions ?? 0} />
+            <Stat label="Flashcards" value={stats?.flashcards ?? 0} />
+            <Stat label="Quizzes saved" value={stats?.quizzes ?? 0} />
+            <Stat label="Level and XP" value={`Lv ${stats?.level ?? 1} · ${stats?.xp ?? 0} XP`} />
+          </section>
 
-          <div className="bg-white shadow rounded-lg divide-y">
-            {activity.map((a, i) => (
-              <div key={i} className="p-4 flex justify-between">
-                <div>
-                  <div className="font-medium">{a.title}</div>
-                  <div className="text-gray-500 text-sm">{a.subtitle}</div>
-                </div>
-                <div className="text-sm text-gray-400">{a.time}</div>
-              </div>
-            ))}
+          <div className={styles.contentGrid}>
+            <section className={styles.panel} aria-labelledby="learning-context-title">
+              <h2 id="learning-context-title">Learning context</h2>
+              <p className={styles.panelIntro}>
+                StudySmart uses this information to personalize explanations,
+                practice, and future study schedules.
+              </p>
+              <LearningContextForm />
+            </section>
+
+            <aside className={styles.panel} aria-labelledby="activity-title">
+              <h2 id="activity-title">Recent activity</h2>
+              {(stats?.activity ?? []).length === 0 ? (
+                <p className={styles.empty}>Your completed study sessions will appear here.</p>
+              ) : (
+                <ol className={styles.activityList}>
+                  {stats?.activity.map((item, index) => (
+                    <li key={`${item.time}-${index}`}>
+                      <strong>{item.title}</strong>
+                      <span>{item.subtitle}</span>
+                      <time dateTime={item.time}>{new Date(item.time).toLocaleString()}</time>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </aside>
           </div>
         </div>
+      </div>
+    </>
+  );
+}
 
-        <div>
-          <h3 className="text-lg font-semibold mb-3">Suggested Study</h3>
-          <div className="bg-white rounded-lg shadow p-6 text-gray-600">
-            AI-powered suggestions will appear here based on your progress.
-          </div>
-        </div>
-      </main>
+function Stat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className={styles.stat}>
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   );
 }

@@ -1,78 +1,146 @@
 import { useEffect, useState } from "react";
+import RequireAuth from "../components/RequireAuth";
+import { useRouter } from "next/router";
+import { useXP } from "../hooks/useXP";
+import Link from "next/link";
 
 type Question = {
   id: string;
+  conceptId?: string | null;
   question: string;
   options: string[];
   correctAnswer: string;
 };
 
 export default function QuizPage() {
+  return (
+    <RequireAuth>
+      <QuizRunner />
+    </RequireAuth>
+  );
+}
+
+function QuizRunner() {
+  const router = useRouter();
+  const { addXP } = useXP();
+  const sessionId =
+    typeof router.query.sessionId === "string"
+      ? router.query.sessionId
+      : undefined;
+
   const [questions, setQuestions] = useState<Question[]>([]);
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+  const [answers, setAnswers] = useState<Record<number, string>>({});
 
   useEffect(() => {
-    fetch("/api/quiz/start", { method: "POST" })
+    if (!router.isReady) {return;}
+    const url = sessionId
+      ? `/api/quiz/start?sessionId=${sessionId}`
+      : "/api/quiz/start";
+    fetch(url, { method: "POST" })
       .then((res) => res.json())
-      .then((data) => setQuestions(data.questions));
-  }, []);
+      .then((data) => {
+        if (data.error) {
+          setError(data.error);
+          return;
+        }
+        setQuestions(data.questions ?? []);
+      })
+      .catch(() => setError("Failed to load quiz"));
+  }, [router.isReady, sessionId]);
 
-  if (!questions.length) return <Center>Loading quiz…</Center>;
-  if (done) return <QuizComplete score={score} total={questions.length} />;
+  if (error) {
+    return (
+      <Center>
+        <p>{error}</p>
+        <Link href="/upload">Upload notes</Link>
+      </Center>
+    );
+  }
+
+  if (!questions.length && !done) {
+    return <Center>Loading quiz…</Center>;
+  }
+
+  if (done) {
+    return (
+      <QuizComplete
+        score={score}
+        total={questions.length}
+        onSave={async () => {
+          await fetch("/api/saveQuiz", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: "Flashcard quiz",
+              source: "flashcards",
+              questions,
+              answers,
+            }),
+          });
+          addXP(score * 8);
+        }}
+      />
+    );
+  }
 
   const q = questions[index];
 
   function answer(option: string) {
     setSelected(option);
-
-    if (option === q.correctAnswer) {
-      setScore((s) => s + 1);
-    }
+    setAnswers((current) => ({ ...current, [index]: option }));
+    if (option === q.correctAnswer) {setScore((s) => s + 1);}
 
     setTimeout(() => {
       setSelected(null);
-      if (index + 1 < questions.length) {
-        setIndex((i) => i + 1);
-      } else {
-        setDone(true);
-      }
+      if (index + 1 < questions.length) {setIndex((i) => i + 1);}
+      else {setDone(true);}
     }, 700);
   }
 
   return (
-    <div className="min-h-screen bg-indigo-50 p-6">
-      <div className="max-w-xl mx-auto bg-white rounded-xl shadow-lg p-6">
-        <p className="text-sm mb-2">
+    <div className="practice-page">
+      <div
+        className="practice-panel"
+        style={{
+          maxWidth: 560,
+          margin: "0 auto",
+        }}
+      >
+        <p style={{ fontSize: 14, marginBottom: 8 }}>
           Question {index + 1} / {questions.length}
         </p>
-
-        <h2 className="text-2xl font-bold mb-6">{q.question}</h2>
-
-        <div className="grid gap-4">
+        <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20 }}>
+          {q.question}
+        </h2>
+        <div style={{ display: "grid", gap: 12 }}>
           {q.options.map((opt) => {
             const isCorrect = opt === q.correctAnswer;
             const isSelected = opt === selected;
-
-            let style =
-              "border p-4 rounded-lg text-left transition font-medium";
-
+            let bg = "rgba(9,29,61,.85)";
             if (selected) {
-              if (isCorrect) style += " bg-green-500 text-white";
-              else if (isSelected) style += " bg-red-500 text-white";
-              else style += " opacity-50";
-            } else {
-              style += " hover:bg-indigo-100";
+              if (isCorrect) {bg = "#22c55e";}
+              else if (isSelected) {bg = "#ef4444";}
             }
-
             return (
               <button
                 key={opt}
+                type="button"
                 disabled={!!selected}
                 onClick={() => answer(opt)}
-                className={style}
+                style={{
+                  textAlign: "left",
+                  padding: 14,
+                  borderRadius: 10,
+                  border: "1px solid rgba(125,211,252,.16)",
+                  background: bg,
+                  color: "#fff",
+                  cursor: selected ? "default" : "pointer",
+                }}
               >
                 {opt}
               </button>
@@ -84,31 +152,61 @@ export default function QuizPage() {
   );
 }
 
-/* ---------------------------------- */
-
 function Center({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex items-center justify-center text-xl">
+    <div className="practice-page"
+      style={{
+        minHeight: "60vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 12,
+      }}
+    >
       {children}
     </div>
   );
 }
 
-function QuizComplete({ score, total }: { score: number; total: number }) {
+function QuizComplete({
+  score,
+  total,
+  onSave,
+}: {
+  score: number;
+  total: number;
+  onSave: () => void;
+}) {
+  useEffect(() => {
+    onSave();
+  }, [onSave]);
+
   return (
     <Center>
-      <div className="bg-white p-8 rounded-xl shadow-lg text-center">
-        <h1 className="text-3xl font-bold mb-4">🧠 Quiz Complete</h1>
-        <p className="text-xl">
+      <div className="practice-panel"
+        style={{
+          textAlign: "center",
+        }}
+      >
+        <h1 style={{ fontSize: 28, fontWeight: 700 }}>Quiz complete</h1>
+        <p style={{ fontSize: 20, marginTop: 8 }}>
           Score: {score} / {total}
         </p>
-
-        <a
-          href="/flashcards"
-          className="inline-block mt-6 px-6 py-3 bg-indigo-600 text-white rounded-lg"
+        <Link
+          href="/dashboard"
+          style={{
+            display: "inline-block",
+            marginTop: 20,
+            padding: "12px 24px",
+            background: "linear-gradient(135deg,#1559e8,#168bff)",
+            color: "#fff",
+            borderRadius: 10,
+            textDecoration: "none",
+          }}
         >
-          Back to Flashcards
-        </a>
+          Dashboard
+        </Link>
       </div>
     </Center>
   );

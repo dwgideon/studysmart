@@ -1,120 +1,159 @@
 import { useEffect, useState } from "react";
-import { useUser } from "@supabase/auth-helpers-react";
-import { supabase } from "../lib/supabaseClient";
+import RequireAuth from "../components/RequireAuth";
+import { useXP } from "../hooks/useXP";
+import Link from "next/link";
 
-type Question = {
-  statement: string;
-  answer: boolean;
-};
+type Question = { statement: string; answer: boolean };
 
-type LeaderboardEntry = {
-  username: string;
-  score: number;
-};
+type LeaderboardEntry = { rank: number; username: string; score: number };
 
 export default function GamesPage() {
-  const user = useUser();
+  return (
+    <RequireAuth>
+      <TrueFalseGame />
+    </RequireAuth>
+  );
+}
+
+function TrueFalseGame() {
+  const { addXP } = useXP();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [index, setIndex] = useState(0);
   const [feedback, setFeedback] = useState("");
   const [score, setScore] = useState(0);
+  const [finished, setFinished] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchNotesAndGenerateQuestions = async () => {
-      if (!user) return;
+    fetch("/api/games/true-false", { method: "POST" })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (response.status === 423 && payload.code === "LEARNING_LOCKED") {
+          window.location.assign("/safety-lock");
+        }
+        return payload;
+      })
+      .then((d) => {
+        if (d.error) {
+          setFeedback(d.error);
+        } else {
+          setQuestions(d.questions ?? []);
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
 
-      const { data: notes } = await supabase
-        .from("notes")
-        .select("content")
-        .eq("user_id", user.id);
-
-      const text = notes?.map((n) => n.content).join("\n\n") || "";
-
-      const { data, error } = await supabase.functions.invoke(
-        "generate_true_false",
-        { body: { text } }
-      );
-
-      if (!error && data?.questions) {
-        setQuestions(data.questions);
-      }
-    };
-
-    fetchNotesAndGenerateQuestions();
-  }, [user]);
+    fetch("/api/games/leaderboard")
+      .then((r) => r.json())
+      .then((d) => setLeaderboard(d.leaderboard ?? []));
+  }, []);
 
   const handleAnswer = (value: boolean) => {
     const correct = questions[index]?.answer === value;
+    const nextScore = correct ? score + 1 : score;
 
     if (correct) {
-      setFeedback("✅ Correct!");
-      setScore((s) => s + 1);
+      setFeedback("Correct!");
+      setScore(nextScore);
     } else {
-      setFeedback("❌ Incorrect.");
+      setFeedback("Incorrect.");
     }
 
     setTimeout(() => {
       setFeedback("");
-      setIndex((i) => (i + 1) % questions.length);
+      if (index + 1 < questions.length) {
+        setIndex((i) => i + 1);
+      } else {
+        setFinished(true);
+        submitScore(nextScore);
+      }
     }, 800);
   };
 
-  const submitScore = async () => {
-    if (!user) return;
-
-    await supabase.from("leaderboard").insert({
-      user_id: user.id,
-      username: user.user_metadata?.name || "Anonymous",
-      score,
+  const submitScore = async (finalScore: number) => {
+    const res = await fetch("/api/games/leaderboard", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ score: finalScore }),
     });
-
-    fetchLeaderboard();
+    const data = await res.json();
+    if (data.xpGain) {addXP(data.xpGain);}
+    const lb = await fetch("/api/games/leaderboard").then((r) => r.json());
+    setLeaderboard(lb.leaderboard ?? []);
   };
 
-  const fetchLeaderboard = async () => {
-    const { data } = await supabase
-      .from("leaderboard")
-      .select("username, score")
-      .order("score", { ascending: false })
-      .limit(10);
+  if (loading) {return <Wrap>Loading game…</Wrap>;}
 
-    setLeaderboard(data || []);
-  };
+  if (!questions.length) {
+    return (
+      <Wrap>
+        <p>{feedback || "Could not load questions."}</p>
+        <Link href="/upload">Add flashcards first</Link>
+      </Wrap>
+    );
+  }
 
-  useEffect(() => {
-    fetchLeaderboard();
-  }, []);
+  if (finished) {
+    return (
+      <Wrap>
+        <h2>Round complete</h2>
+        <p>
+          Score: {score} / {questions.length}
+        </p>
+        <button type="button" onClick={() => window.location.reload()}>
+          Play again
+        </button>
+        <LeaderboardList entries={leaderboard} />
+      </Wrap>
+    );
+  }
 
-  if (!questions.length)
-    return <div className="p-10 text-center">Loading game…</div>;
+  const q = questions[index];
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-12 text-center">
-      <h1 className="text-3xl font-bold mb-6">True or False Showdown</h1>
-
-      <div className="bg-white shadow rounded p-6 text-xl mb-6">
-        {questions[index]?.statement}
+    <Wrap>
+      <h1>True or false</h1>
+      <p>
+        Question {index + 1} / {questions.length}
+      </p>
+      <p style={{ fontSize: 18, margin: "20px 0" }}>{q.statement}</p>
+      <div aria-live="polite">
+        {feedback && <p style={{ fontWeight: 600 }}>{feedback}</p>}
       </div>
-
-      <div className="flex justify-center gap-6 mb-4">
-        <button onClick={() => handleAnswer(true)}>True</button>
-        <button onClick={() => handleAnswer(false)}>False</button>
+      <div style={{ display: "flex", gap: 12 }}>
+        <button type="button" onClick={() => handleAnswer(true)}>
+          True
+        </button>
+        <button type="button" onClick={() => handleAnswer(false)}>
+          False
+        </button>
       </div>
+      <LeaderboardList entries={leaderboard} />
+    </Wrap>
+  );
+}
 
-      {feedback && <div className="mb-4">{feedback}</div>}
-      <div className="mb-6">Score: {score}</div>
-
-      <button onClick={submitScore}>Submit Score</button>
-
-      <h2 className="mt-10 mb-4">🏆 Leaderboard</h2>
+function LeaderboardList({ entries }: { entries: LeaderboardEntry[] }) {
+  if (!entries.length) {return null;}
+  return (
+    <div style={{ marginTop: 32 }}>
+      <h3>XP leaderboard</h3>
       <ol>
-        {leaderboard.map((e, i) => (
-          <li key={i}>
-            {e.username}: {e.score}
+        {entries.map((e) => (
+          <li key={e.rank}>
+            #{e.rank} {e.username} — {e.score} XP
           </li>
         ))}
       </ol>
+    </div>
+  );
+}
+
+function Wrap({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="practice-page" style={{ maxWidth: 620 }}>
+      <div className="practice-panel">{children}</div>
     </div>
   );
 }

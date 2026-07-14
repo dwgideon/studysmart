@@ -16,6 +16,15 @@ export default async function handler(
   }
 
   try {
+    if (
+      !process.env.STRIPE_SECRET_KEY ||
+      process.env.STRIPE_SECRET_KEY.includes("PASTE_NEW")
+    ) {
+      return res.status(503).json({
+        error: "Payments are not configured. Add Stripe keys to .env.",
+      });
+    }
+
     const { priceKey, user } = req.body as {
       priceKey?: keyof typeof PRICE_MAP;
       user?: { id?: string; email?: string };

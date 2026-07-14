@@ -7,75 +7,1074 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-//////////////////////////////////////////////////////////
-// PUBLIC APP MODELS
-//////////////////////////////////////////////////////////
-
 model User {
-  id        String      @id @db.Uuid
-  email     String      @unique
-  name      String?
-  createdAt DateTime    @default(now())
+  id                     String    @id @db.Uuid
+  email                  String    @unique
+  name                   String?
+  xp                     Int       @default(0)
+  stripeCustomerId       String?
+  plan                   String?
+  accountRole            String    @default("STUDENT")
+  ageGroup               String    @default("UNKNOWN")
+  roleVerificationStatus String    @default("NOT_REQUIRED")
+  verifiedAt             DateTime?
+  safetyStrikeCount      Int       @default(0)
+  learningLockedUntil    DateTime?
+  createdAt              DateTime  @default(now())
 
-  flashcards Flashcard[]
-  sessions   StudySession[]
-  streak     StudyStreak?
+  flashcards              Flashcard[]
+  sessions                StudySession[]
+  streak                  StudyStreak?
+  cardReviews             CardReview[]
+  savedQuizzes            SavedQuiz[]
+  notes                   Note[]
+  learnerProfile          LearnerProfile?
+  courses                 Course[]
+  conceptMasteries        ConceptMastery[]
+  masteryEvidence         MasteryEvidence[]
+  tutorConversations      TutorConversation[]
+  sourceMaterials         SourceMaterial[]
+  classroomsTaught        Classroom[]              @relation("ClassroomTeacher")
+  classroomMemberships    ClassroomMembership[]
+  guardianLinks           GuardianStudent[]        @relation("GuardianLinks")
+  guardians               GuardianStudent[]        @relation("StudentGuardians")
+  guardianInvites         GuardianInvite[]
+  assignmentsCreated      Assignment[]             @relation("AssignmentTeacher")
+  assignmentSubmissions   AssignmentSubmission[]
+  diagnosticAssessments   DiagnosticAssessment[]
+  privacySettings         PrivacySettings?
+  consentsGiven           ConsentRecord[]          @relation("ConsentActor")
+  consentsFor             ConsentRecord[]          @relation("ConsentSubject")
+  roleVerifications       RoleVerification[]
+  safetyEvents            SafetyEvent[]
+  safetyViolations        SafetyViolation[]
+  safetyNotifications     SafetyNotification[]
+  safetyContactPreference SafetyContactPreference?
+  pushSubscriptions       PushSubscription[]
+  dataRightsRequests      DataRightsRequest[]
+  auditEvents             AuditEvent[]
+  integrationConnections  IntegrationConnection[]
+  aiInteractionTraces     AiInteractionTrace[]
+  experimentAssignments   ExperimentAssignment[]
+  experimentEvents        ExperimentEvent[]
+  organizationsCreated    Organization[]           @relation("OrganizationCreator")
+  organizationMemberships OrganizationMembership[]
 
   @@index([email])
 }
 
-//////////////////////////////////////////////////////////
-// STUDY SESSIONS
-//////////////////////////////////////////////////////////
+model LearnerProfile {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String    @unique @db.Uuid
+  gradeLevel          String
+  primaryLearningGoal String?
+  onboardingCompleted Boolean   @default(false)
+  dailyReviewLimit    Int       @default(20)
+  diagnosticCompleted Boolean   @default(false)
+  lastDiagnosticAt    DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-model StudySession {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId     String   @db.Uuid
-  createdAt  DateTime @default(now())
-  totalCards Int      @default(0)
-  correct    Int      @default(0)
-  incorrect  Int      @default(0)
-  completed  Boolean  @default(false)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user       User         @relation(fields: [userId], references: [id])
-  flashcards Flashcard[]
+  @@index([gradeLevel])
+}
+
+model Course {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @db.Uuid
+  name         String
+  subject      String
+  examDate     DateTime?
+  learningGoal String?
+  isPrimary    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studySessions         StudySession[]
+  concepts              Concept[]
+  tutorConversations    TutorConversation[]
+  savedQuizzes          SavedQuiz[]
+  sourceMaterials       SourceMaterial[]
+  diagnosticAssessments DiagnosticAssessment[]
 
   @@index([userId])
+  @@index([userId, isPrimary])
+  @@index([examDate])
+}
+
+model StudySession {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String   @db.Uuid
+  courseId         String?  @db.Uuid
+  sourceMaterialId String?  @db.Uuid
+  title            String?
+  createdAt        DateTime @default(now())
+  totalCards       Int      @default(0)
+  correct          Int      @default(0)
+  incorrect        Int      @default(0)
+  completed        Boolean  @default(false)
+
+  user           User            @relation(fields: [userId], references: [id])
+  course         Course?         @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  sourceMaterial SourceMaterial? @relation(fields: [sourceMaterialId], references: [id], onDelete: SetNull)
+  flashcards     Flashcard[]
+  cardReviews    CardReview[]
+
+  @@index([userId])
+  @@index([courseId])
+  @@index([sourceMaterialId])
   @@index([createdAt])
 }
 
-//////////////////////////////////////////////////////////
-// FLASHCARDS
-//////////////////////////////////////////////////////////
-
 model Flashcard {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String   @db.Uuid
-  sessionId String   @db.Uuid
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String  @db.Uuid
+  sessionId String  @db.Uuid
+  conceptId String? @db.Uuid
 
-  question  String
-  answer    String
-  createdAt DateTime @default(now())
+  question             String
+  answer               String
+  createdAt            DateTime  @default(now())
+  nextReviewAt         DateTime  @default(now())
+  lastReviewedAt       DateTime?
+  intervalDays         Float     @default(0)
+  easeFactor           Float     @default(2.5)
+  scheduledReviewCount Int       @default(0)
+  lapseCount           Int       @default(0)
+  memoryStability      Float     @default(1)
+  memoryDifficulty     Float     @default(5)
+  targetRetention      Float     @default(0.9)
 
   user    User         @relation(fields: [userId], references: [id])
   session StudySession @relation(fields: [sessionId], references: [id])
+  concept Concept?     @relation(fields: [conceptId], references: [id], onDelete: SetNull)
+  reviews CardReview[]
 
   @@index([userId])
   @@index([sessionId])
+  @@index([conceptId])
+  @@index([userId, nextReviewAt])
 }
 
-//////////////////////////////////////////////////////////
-// STUDY STREAKS
-//////////////////////////////////////////////////////////
+model Concept {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  courseId           String   @db.Uuid
+  name               String
+  normalizedName     String
+  description        String?
+  standardFramework  String?
+  standardCode       String?
+  gradeBand          String?
+  domain             String?
+  academicStandardId String?  @db.Uuid
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-model StudyStreak {
+  course            Course                    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  flashcards        Flashcard[]
+  masteries         ConceptMastery[]
+  tutorMessages     TutorMessage[]
+  quizResults       QuizConceptResult[]
+  diagnosticResults DiagnosticConceptResult[]
+  prerequisites     ConceptPrerequisite[]     @relation("ConceptPrerequisites")
+  supports          ConceptPrerequisite[]     @relation("PrerequisiteConcepts")
+  evidence          MasteryEvidence[]
+  academicStandard  AcademicStandard?         @relation(fields: [academicStandardId], references: [id], onDelete: SetNull)
+
+  @@unique([courseId, normalizedName])
+  @@index([courseId])
+  @@index([standardFramework, standardCode])
+  @@index([academicStandardId])
+}
+
+model AcademicStandard {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  framework   String
+  version     String
+  code        String
+  uri         String?
+  title       String
+  description String?
+  gradeBand   String?
+  subject     String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  concepts Concept[]
+  outgoing StandardAssociation[] @relation("StandardSource")
+  incoming StandardAssociation[] @relation("StandardTarget")
+
+  @@unique([framework, version, code])
+  @@index([subject, gradeBand])
+}
+
+model StandardAssociation {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sourceId String @db.Uuid
+  targetId String @db.Uuid
+  type     String
+  metadata Json?
+
+  source AcademicStandard @relation("StandardSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  target AcademicStandard @relation("StandardTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId, type])
+  @@index([targetId, type])
+}
+
+model ConceptPrerequisite {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId         String   @unique @db.Uuid
-  currentStreak  Int      @default(0)
-  longestStreak  Int      @default(0)
-  lastStudyDate  DateTime?
+  conceptId      String   @db.Uuid
+  prerequisiteId String   @db.Uuid
+  strength       Float    @default(1)
+  source         String   @default("INFERRED")
+  createdAt      DateTime @default(now())
 
-  user           User     @relation(fields: [userId], references: [id])
+  concept      Concept @relation("ConceptPrerequisites", fields: [conceptId], references: [id], onDelete: Cascade)
+  prerequisite Concept @relation("PrerequisiteConcepts", fields: [prerequisiteId], references: [id], onDelete: Cascade)
+
+  @@unique([conceptId, prerequisiteId])
+  @@index([prerequisiteId])
+}
+
+model Classroom {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teacherId      String    @db.Uuid
+  organizationId String?   @db.Uuid
+  name           String
+  subject        String
+  gradeBand      String
+  joinCode       String    @unique
+  archivedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  teacher      User                  @relation("ClassroomTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  organization Organization?         @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  memberships  ClassroomMembership[]
+  assignments  Assignment[]
+
+  @@index([teacherId, archivedAt])
+  @@index([organizationId, archivedAt])
+}
+
+model ClassroomMembership {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  classroomId String   @db.Uuid
+  studentId   String   @db.Uuid
+  status      String   @default("ACTIVE")
+  joinedAt    DateTime @default(now())
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  student   User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, studentId])
+  @@index([studentId, status])
+}
+
+model GuardianInvite {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guardianId String    @db.Uuid
+  code       String    @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  guardian User @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@index([guardianId, expiresAt])
+}
+
+model GuardianStudent {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guardianId   String   @db.Uuid
+  studentId    String   @db.Uuid
+  relationship String   @default("Guardian")
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+
+  guardian User @relation("GuardianLinks", fields: [guardianId], references: [id], onDelete: Cascade)
+  student  User @relation("StudentGuardians", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([guardianId, studentId])
+  @@index([studentId, status])
+}
+
+model Assignment {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  classroomId    String    @db.Uuid
+  teacherId      String    @db.Uuid
+  title          String
+  instructions   String?
+  targetConcepts Json?
+  dueAt          DateTime?
+  createdAt      DateTime  @default(now())
+
+  classroom   Classroom              @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  teacher     User                   @relation("AssignmentTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  submissions AssignmentSubmission[]
+
+  @@index([classroomId, dueAt])
+  @@index([teacherId])
+}
+
+model AssignmentSubmission {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assignmentId String    @db.Uuid
+  studentId    String    @db.Uuid
+  status       String    @default("ASSIGNED")
+  score        Float?
+  submittedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student    User       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, studentId])
+  @@index([studentId, status])
+}
+
+model DiagnosticAssessment {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String    @db.Uuid
+  courseId        String?   @db.Uuid
+  gradeBand       String
+  subject         String
+  status          String    @default("IN_PROGRESS")
+  questions       Json
+  responses       Json      @default("[]")
+  abilityEstimate Float     @default(0.5)
+  summary         Json?
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+
+  user           User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course         Course?                   @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  conceptResults DiagnosticConceptResult[]
+
+  @@index([userId, status, startedAt])
+  @@index([courseId])
+}
+
+model DiagnosticConceptResult {
+  id               String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assessmentId     String @db.Uuid
+  conceptId        String @db.Uuid
+  correctCount     Int
+  totalCount       Int
+  estimatedMastery Float
+
+  assessment DiagnosticAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  concept    Concept              @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, conceptId])
+  @@index([conceptId])
+}
+
+model ConceptMastery {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String    @db.Uuid
+  conceptId        String    @db.Uuid
+  score            Float     @default(0)
+  confidence       Float     @default(0)
+  status           String    @default("NEW")
+  attempts         Int       @default(0)
+  correctCount     Int       @default(0)
+  incorrectCount   Int       @default(0)
+  uncertainty      Float     @default(1)
+  memoryStability  Float     @default(1)
+  memoryDifficulty Float     @default(5)
+  guessRate        Float     @default(0.2)
+  slipRate         Float     @default(0.1)
+  learningRate     Float     @default(0.15)
+  forgettingRate   Float     @default(0.04)
+  lastEvidenceAt   DateTime?
+  nextReviewAt     DateTime?
+  lastPracticedAt  DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  concept Concept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, conceptId])
+  @@index([userId, status])
+  @@index([conceptId])
+  @@index([userId, nextReviewAt])
+}
+
+model MasteryEvidence {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String   @db.Uuid
+  conceptId         String   @db.Uuid
+  sourceType        String
+  sourceId          String?
+  correct           Boolean
+  difficulty        Float    @default(0.5)
+  responseTimeMs    Int?
+  hintCount         Int      @default(0)
+  independent       Boolean  @default(true)
+  probabilityBefore Float
+  probabilityAfter  Float
+  createdAt         DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  concept Concept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([conceptId, createdAt])
+  @@index([sourceType, sourceId])
+}
+
+model CardReview {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @db.Uuid
+  flashcardId    String   @db.Uuid
+  sessionId      String?  @db.Uuid
+  correct        Boolean
+  responseTimeMs Int?
+  hintCount      Int      @default(0)
+  rating         Int?
+  reviewedAt     DateTime @default(now())
+
+  user      User          @relation(fields: [userId], references: [id])
+  flashcard Flashcard     @relation(fields: [flashcardId], references: [id])
+  session   StudySession? @relation(fields: [sessionId], references: [id])
 
   @@index([userId])
+  @@index([flashcardId])
+  @@index([sessionId])
+}
+
+model StudyStreak {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String    @unique @db.Uuid
+  currentStreak Int       @default(0)
+  longestStreak Int       @default(0)
+  lastStudyDate DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model SavedQuiz {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String   @db.Uuid
+  courseId         String?  @db.Uuid
+  conversationId   String?  @db.Uuid
+  sourceMaterialId String?  @db.Uuid
+  title            String
+  source           String?
+  questions        Json
+  score            Int?
+  total            Int?
+  createdAt        DateTime @default(now())
+
+  user           User                @relation(fields: [userId], references: [id])
+  course         Course?             @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  conversation   TutorConversation?  @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  sourceMaterial SourceMaterial?     @relation(fields: [sourceMaterialId], references: [id], onDelete: SetNull)
+  conceptResults QuizConceptResult[]
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([courseId])
+  @@index([conversationId])
+  @@index([sourceMaterialId])
+}
+
+model TutorConversation {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String   @db.Uuid
+  courseId         String?  @db.Uuid
+  sourceMaterialId String?  @db.Uuid
+  title            String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course         Course?         @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  sourceMaterial SourceMaterial? @relation(fields: [sourceMaterialId], references: [id], onDelete: SetNull)
+  messages       TutorMessage[]
+  quizzes        SavedQuiz[]
+
+  @@index([userId, updatedAt])
+  @@index([courseId])
+  @@index([sourceMaterialId])
+}
+
+model TutorMessage {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId  String   @db.Uuid
+  conceptId       String?  @db.Uuid
+  role            String
+  content         String
+  attributionMode String   @default("GENERAL_KNOWLEDGE")
+  citations       Json?
+  createdAt       DateTime @default(now())
+
+  conversation TutorConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  concept      Concept?          @relation(fields: [conceptId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@index([conceptId])
+}
+
+model SourceMaterial {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String   @db.Uuid
+  courseId           String?  @db.Uuid
+  title              String
+  content            String
+  sourceType         String
+  originalFileName   String?
+  mimeType           String?
+  status             String   @default("READY")
+  extractionMethod   String   @default("TEXT")
+  contentHash        String?
+  processingWarnings Json?
+  metadata           Json?
+  createdAt          DateTime @default(now())
+
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course        Course?             @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  studySessions StudySession[]
+  conversations TutorConversation[]
+  savedQuizzes  SavedQuiz[]
+  chunks        SourceChunk[]
+
+  @@index([userId, createdAt])
+  @@index([courseId, createdAt])
+}
+
+model SourceChunk {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sourceMaterialId String   @db.Uuid
+  chunkIndex       Int
+  content          String
+  contentHash      String
+  locator          Json
+  tokenEstimate    Int
+  embedding        Json?
+  createdAt        DateTime @default(now())
+
+  sourceMaterial SourceMaterial @relation(fields: [sourceMaterialId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceMaterialId, chunkIndex])
+  @@index([sourceMaterialId, chunkIndex])
+  @@index([contentHash])
+}
+
+model QuizConceptResult {
+  id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  savedQuizId  String @db.Uuid
+  conceptId    String @db.Uuid
+  correctCount Int
+  totalCount   Int
+
+  savedQuiz SavedQuiz @relation(fields: [savedQuizId], references: [id], onDelete: Cascade)
+  concept   Concept   @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  @@unique([savedQuizId, conceptId])
+  @@index([conceptId])
+}
+
+model Note {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model PrivacySettings {
+  id                         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                     String   @unique @db.Uuid
+  aiPersonalizationEnabled   Boolean  @default(true)
+  productAnalyticsEnabled    Boolean  @default(false)
+  shareProgressWithTeachers  Boolean  @default(true)
+  shareProgressWithGuardians Boolean  @default(true)
+  tutorHistoryEnabled        Boolean  @default(true)
+  dataRetentionDays          Int      @default(365)
+  textScale                  String   @default("DEFAULT")
+  reduceMotion               Boolean  @default(false)
+  highContrast               Boolean  @default(false)
+  readingFont                Boolean  @default(false)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ConsentRecord {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subjectUserId   String    @db.Uuid
+  grantedByUserId String    @db.Uuid
+  consentType     String
+  status          String
+  noticeVersion   String
+  grantedAt       DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  subject   User @relation("ConsentSubject", fields: [subjectUserId], references: [id], onDelete: Cascade)
+  grantedBy User @relation("ConsentActor", fields: [grantedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([subjectUserId, consentType, status])
+  @@index([grantedByUserId, createdAt])
+}
+
+model RoleVerification {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String    @db.Uuid
+  requestedRole      String
+  organizationName   String?
+  organizationDomain String?
+  status             String    @default("PENDING")
+  reviewNote         String?
+  createdAt          DateTime  @default(now())
+  reviewedAt         DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
+}
+
+model SafetyEvent {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String?  @db.Uuid
+  category      String
+  severity      String
+  action        String
+  source        String
+  contentHash   String?
+  reviewSummary String?
+  createdAt     DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([severity, createdAt])
+}
+
+model SafetyViolation {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String    @db.Uuid
+  category        String
+  source          String
+  ciphertext      String?
+  iv              String?
+  authTag         String?
+  detailsPurgedAt DateTime?
+  attemptNumber   Int
+  lockoutUntil    DateTime?
+  appealedAt      DateTime?
+  resolution      String?
+  createdAt       DateTime  @default(now())
+
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications SafetyNotification[]
+
+  @@index([userId, createdAt])
+  @@index([lockoutUntil])
+}
+
+model SafetyNotification {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipientUserId      String    @db.Uuid
+  violationId          String    @db.Uuid
+  recipientRole        String
+  readAt               DateTime?
+  acknowledgedAt       DateTime?
+  acknowledgedByUserId String?   @db.Uuid
+  responseStatus       String    @default("UNACKNOWLEDGED")
+  escalationLevel      Int       @default(0)
+  lastEscalatedAt      DateTime?
+  createdAt            DateTime  @default(now())
+
+  recipient  User             @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  violation  SafetyViolation  @relation(fields: [violationId], references: [id], onDelete: Cascade)
+  deliveries SafetyDelivery[]
+
+  @@unique([recipientUserId, violationId])
+  @@index([recipientUserId, readAt, createdAt])
+  @@index([responseStatus, createdAt])
+}
+
+model SafetyContactPreference {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @unique @db.Uuid
+  emailEnabled    Boolean  @default(true)
+  smsEnabled      Boolean  @default(false)
+  pushEnabled     Boolean  @default(false)
+  phoneCiphertext String?
+  phoneIv         String?
+  phoneAuthTag    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PushSubscription {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, active])
+}
+
+model SafetyDelivery {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  notificationId  String    @db.Uuid
+  channel         String
+  escalationLevel Int       @default(0)
+  status          String    @default("PENDING")
+  attemptCount    Int       @default(0)
+  nextAttemptAt   DateTime  @default(now())
+  lastAttemptAt   DateTime?
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  providerId      String?
+  lastError       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  notification SafetyNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, channel, escalationLevel])
+  @@index([status, nextAttemptAt])
+  @@index([notificationId, createdAt])
+}
+
+model DataRightsRequest {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @db.Uuid
+  requestType String
+  status      String    @default("OPEN")
+  requestedAt DateTime  @default(now())
+  completedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, requestedAt])
+}
+
+model AuditEvent {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorUserId  String?  @db.Uuid
+  subjectId    String?
+  action       String
+  resourceType String
+  resourceId   String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([subjectId, createdAt])
+  @@index([resourceType, resourceId])
+}
+
+model RateLimitBucket {
+  key       String   @id
+  count     Int      @default(0)
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
+}
+
+model IntegrationConnection {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerUserId String   @db.Uuid
+  type        String
+  name        String
+  status      String   @default("ACTIVE")
+  config      Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User              @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  mappings    ExternalMapping[]
+  deployments LtiDeployment[]
+
+  @@unique([ownerUserId, type, name])
+  @@index([type, status])
+}
+
+model ExternalMapping {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  integrationId String   @db.Uuid
+  entityType    String
+  externalId    String
+  internalId    String
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  integration IntegrationConnection @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId, entityType, externalId])
+  @@index([entityType, internalId])
+}
+
+model LtiDeployment {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  integrationId String   @db.Uuid
+  issuer        String
+  clientId      String
+  deploymentId  String
+  authLoginUrl  String
+  authTokenUrl  String?
+  jwksUrl       String
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  integration  IntegrationConnection @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  launchStates LtiLaunchState[]
+  launches     LtiLaunch[]
+
+  @@unique([issuer, clientId, deploymentId])
+  @@index([integrationId, active])
+}
+
+model LtiLaunchState {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  deploymentId  String    @db.Uuid
+  stateHash     String    @unique
+  nonceHash     String
+  targetLinkUri String
+  loginHint     String?
+  messageHint   String?
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  deployment LtiDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt, usedAt])
+}
+
+model LtiLaunch {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  deploymentId   String   @db.Uuid
+  subjectHash    String
+  contextId      String?
+  resourceLinkId String?
+  roles          Json
+  claims         Json?
+  createdAt      DateTime @default(now())
+
+  deployment LtiDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  @@index([deploymentId, createdAt])
+  @@index([subjectHash])
+}
+
+model AiInteractionTrace {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String?  @db.Uuid
+  feature        String
+  model          String
+  promptVersion  String
+  inputHash      String
+  outputHash     String
+  latencyMs      Int
+  allowed        Boolean  @default(true)
+  safetyCategory String?
+  grounded       Boolean  @default(false)
+  citationCount  Int      @default(0)
+  errorCode      String?
+  createdAt      DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([feature, model, createdAt])
+  @@index([safetyCategory, createdAt])
+  @@index([userId, createdAt])
+}
+
+model AiMetricDaily {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  day                 DateTime @db.Date
+  feature             String
+  model               String
+  requestCount        Int
+  failureCount        Int
+  blockedCount        Int
+  criticalSafetyCount Int
+  meanLatencyMs       Float
+  groundingRate       Float
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([day, feature, model])
+  @@index([day, feature])
+}
+
+model AiEvalRun {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  suite       String
+  status      String    @default("RUNNING")
+  summary     Json?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  results AiEvalResult[]
+
+  @@index([suite, startedAt])
+  @@index([status, startedAt])
+}
+
+model AiEvalResult {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId     String   @db.Uuid
+  caseKey   String
+  passed    Boolean
+  severity  String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  run AiEvalRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, caseKey])
+  @@index([passed, severity, createdAt])
+}
+
+model Experiment {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key        String    @unique
+  name       String
+  hypothesis String
+  status     String    @default("DRAFT")
+  variants   Json
+  allocation Json
+  guardrails Json
+  startsAt   DateTime?
+  endsAt     DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  assignments ExperimentAssignment[]
+  events      ExperimentEvent[]
+
+  @@index([status, startsAt, endsAt])
+}
+
+model ExperimentAssignment {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  experimentId String   @db.Uuid
+  userId       String   @db.Uuid
+  variant      String
+  assignedAt   DateTime @default(now())
+
+  experiment Experiment        @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events     ExperimentEvent[]
+
+  @@unique([experimentId, userId])
+  @@index([userId, assignedAt])
+}
+
+model ExperimentEvent {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  experimentId String   @db.Uuid
+  assignmentId String?  @db.Uuid
+  userId       String   @db.Uuid
+  eventName    String
+  value        Float?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  experiment Experiment            @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  assignment ExperimentAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([experimentId, eventName, createdAt])
+  @@index([userId, createdAt])
+}
+
+model Organization {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String
+  slug            String   @unique
+  verifiedDomain  String?  @unique
+  status          String   @default("PENDING")
+  createdByUserId String?  @db.Uuid
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  createdBy   User?                    @relation("OrganizationCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  memberships OrganizationMembership[]
+  policy      DistrictPolicy?
+  classrooms  Classroom[]
+
+  @@index([status, name])
+}
+
+model OrganizationMembership {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @db.Uuid
+  userId         String    @db.Uuid
+  role           String    @default("TEACHER")
+  status         String    @default("ACTIVE")
+  verifiedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId, status])
+  @@index([organizationId, role, status])
+}
+
+model DistrictPolicy {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId           String   @unique @db.Uuid
+  allowedGradeBands        Json
+  aiTutorEnabled           Boolean  @default(true)
+  multimodalEnabled        Boolean  @default(true)
+  externalKnowledgeEnabled Boolean  @default(true)
+  requireGuardianConsent   Boolean  @default(true)
+  dataRetentionDays        Int      @default(365)
+  safetyAlertChannels      Json
+  lockedSettings           Json
+  policyVersion            Int      @default(1)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([updatedAt])
+}
+
+model DataRetentionRun {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  status      String    @default("RUNNING")
+  summary     Json?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([status, startedAt])
 }

@@ -1,17 +1,1 @@
-.page {
-  min-height: 100vh;
-  padding: 60px;
-  background: radial-gradient(circle at top, #0b1c36, #020617);
-  color: white;
-}
-
-.button {
-  margin-top: 20px;
-  padding: 12px 24px;
-  font-size: 16px;
-  border-radius: 999px;
-  border: none;
-  background: linear-gradient(90deg, #6366f1, #3b82f6);
-  color: white;
-  cursor: pointer;
-}
+.page{margin:0 auto;max-width:1000px;min-height:calc(100vh - 82px);padding:clamp(3rem,8vw,7rem) 1.25rem}.page h1{font-size:clamp(2.8rem,7vw,5rem);letter-spacing:-.06em;margin:0 0 1rem}.page>p{color:var(--text-secondary)}.actions{display:grid;gap:1rem;grid-template-columns:repeat(3,1fr);margin-top:2rem}.button{background:linear-gradient(145deg,rgba(13,42,85,.85),rgba(5,19,42,.94));border:1px solid var(--border-subtle);border-radius:var(--radius-lg);box-shadow:var(--shadow-soft);color:white;font-size:1rem;font-weight:800;min-height:150px;padding:1.2rem;transition:.2s}.button:hover{border-color:var(--border-bright);box-shadow:var(--shadow-blue);transform:translateY(-3px)}@media(max-width:650px){.actions{grid-template-columns:1fr}.button{min-height:80px}}

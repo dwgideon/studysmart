@@ -1,0 +1,44 @@
+.page { max-width: 1100px; margin: 0 auto; padding: 2.5rem 1rem 5rem; }
+.hero { align-items: flex-end; display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+.hero h1 { font-size: clamp(2rem,6vw,3.5rem); margin: .2rem 0; }
+.hero p { color: var(--text-secondary); margin: 0; }
+.hero label { color: var(--text-muted); display: grid; font-size: .78rem; font-weight: 800; gap: .25rem; min-width: 180px; }
+.hero select,.form input,.form select,.assignmentForm input { background: #10192d; border: 1px solid #334155; border-radius: .7rem; color: var(--text-primary); padding: .7rem; }
+.eyebrow { color: #7dd3fc; font-size: .72rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit,minmax(min(100%,420px),1fr)); }
+.panel { background: rgba(9,15,31,.92); border: 1px solid var(--border-subtle); border-radius: 1.1rem; padding: 1.25rem; }
+.panel h2 { margin: .25rem 0 1rem; }
+.panelHead { align-items: flex-start; display: flex; justify-content: space-between; gap: 1rem; }
+.panelHead code,.invite code { background: #172554; border: 1px solid #1d4ed8; border-radius: .5rem; color: #bfdbfe; font-weight: 900; padding: .5rem; }
+.form,.assignmentForm { display: grid; gap: .6rem; margin-top: .8rem; }
+.form button,.assignmentForm button,.panel > button,.task button { background: #4f46e5; border: 0; border-radius: .7rem; color: white; cursor: pointer; font-weight: 800; padding: .7rem 1rem; }
+.studentRow,.task { align-items: center; background: #10192d; border: 1px solid #263552; border-radius: .8rem; display: flex; justify-content: space-between; gap: 1rem; margin: .6rem 0; padding: .85rem; }
+.studentRow > div:first-child { display: grid; gap: .2rem; }
+.studentRow span,.task span,.muted { color: var(--text-muted); font-size: .83rem; }
+.alert,.steady { border-radius: .6rem; display: grid; font-size: .75rem; gap: .15rem; max-width: 52%; padding: .45rem .6rem; }
+.alert { background: #451a1a; color: #fecaca; }
+.steady { background: #052e2b; color: #99f6e4; }
+.assignment { border-top: 1px solid #263552; display: flex; justify-content: space-between; padding-top: .7rem; }
+.assignment span { color: var(--text-muted); font-size: .8rem; }
+.invite { display: grid; gap: .7rem; justify-items: start; }
+.invite span { color: var(--text-secondary); }
+.task p { color: var(--text-secondary); margin: .25rem 0; }
+.task button:disabled { background: #334155; }
+.success { color: #86efac; }.error { color: #fca5a5; }
+.notice { align-items: center; background: #422006; border: 1px solid #a16207; border-radius: .9rem; display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; padding: 1rem; }
+.notice p { color: #fde68a; margin: .2rem 0 0; }
+.notice a { background: #f59e0b; border-radius: .6rem; color: #1c1917; font-weight: 900; padding: .65rem .9rem; text-decoration: none; }
+.safetyPanel { background: #250f16; border: 1px solid #9f1239; border-radius: 1rem; margin-bottom: 1rem; padding: clamp(1rem,4vw,1.4rem); }
+.safetyHead { align-items: center; display: flex; justify-content: space-between; gap: 1rem; }
+.safetyHead h2 { margin: .15rem 0; }.safetyEyebrow { color: #fda4af; font-size: .7rem; font-weight: 900; letter-spacing: .11em; margin: 0; text-transform: uppercase; }
+.unreadBadge { background: #9f1239; border-radius: 999px; color: white; font-size: .78rem; font-weight: 900; padding: .35rem .65rem; white-space: nowrap; }
+.safetyIntro { color: #fecdd3; line-height: 1.5; max-width: 780px; }
+.safetyAlert { background: #10192d; border: 1px solid #be123c; border-radius: .85rem; margin-top: .75rem; padding: 1rem; }.safetyAlert.reviewed { border-color: #475569; opacity: .86; }
+.alertMeta { align-items: flex-start; display: flex; justify-content: space-between; gap: 1rem; }.alertMeta > div { display: grid; gap: .2rem; }.alertMeta span,.alertMeta time { color: #cbd5e1; font-size: .8rem; }.alertMeta span { text-transform: capitalize; }
+.lockedNotice { background: #7f1d1d; border-radius: .55rem; color: #fee2e2; font-weight: 800; padding: .6rem; }
+.attempt { background: #070d1b; border-radius: .65rem; margin: .8rem 0; padding: .75rem; }.attempt summary { align-items: center; color: #fda4af; cursor: pointer; display: flex; font-weight: 850; min-height: 44px; }.attempt blockquote { border-left: 3px solid #be123c; color: #f8fafc; margin: .75rem 0 0; max-height: 260px; overflow: auto; overflow-wrap: anywhere; padding: .25rem .75rem; white-space: pre-wrap; }
+.safetyAlert button { background: #be123c; border: 0; border-radius: .6rem; color: white; cursor: pointer; font-weight: 850; min-height: 44px; padding: .65rem .9rem; }.safetyAlert button:disabled { background: #475569; cursor: default; }
+.alertActions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .75rem; }
+.deliveryState { color: #cbd5e1; font-size: .78rem; margin: .7rem 0; text-transform: capitalize; }
+@media (max-width: 620px) { .hero,.studentRow,.task { align-items: stretch; flex-direction: column; }.alert,.steady { max-width: none; }.hero label { width: 100%; } }
+@media (max-width: 620px) { .safetyHead,.alertMeta { align-items: stretch; flex-direction: column; } }

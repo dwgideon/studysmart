@@ -18,14 +18,25 @@ function buffer(readable: Readable): Promise<Buffer> {
   });
 }
 
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unknown error";
+}
+
+function subscriptionPeriodEnd(subscription: Stripe.Subscription) {
+  const value = (
+    subscription as unknown as { current_period_end?: unknown }
+  ).current_period_end;
+  return typeof value === "number" ? value : null;
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== "POST") return res.status(405).end("Method not allowed");
+  if (req.method !== "POST") {return res.status(405).end("Method not allowed");}
 
   const sig = req.headers["stripe-signature"] as string | undefined;
-  if (!sig) return res.status(400).send("Missing Stripe signature");
+  if (!sig) {return res.status(400).send("Missing Stripe signature");}
 
   const buf = await buffer(req);
 
@@ -37,9 +48,10 @@ export default async function handler(
       sig,
       process.env.STRIPE_WEBHOOK_SECRET as string
     );
-  } catch (err: any) {
-    console.error("Webhook signature verification failed:", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+  } catch (err: unknown) {
+    const message = errorMessage(err);
+    console.error("Webhook signature verification failed:", message);
+    return res.status(400).send(`Webhook Error: ${message}`);
   }
 
   try {
@@ -71,11 +83,11 @@ export default async function handler(
 
         if (subscriptionId) {
           const sub = await stripe.subscriptions.retrieve(subscriptionId);
-          const rawSub = sub as any;
+          const periodEnd = subscriptionPeriodEnd(sub);
 
-          status = rawSub.status || "active";
-          current_period_end = rawSub.current_period_end
-            ? new Date(rawSub.current_period_end * 1000).toISOString()
+          status = sub.status || "active";
+          current_period_end = periodEnd
+            ? new Date(periodEnd * 1000).toISOString()
             : null;
         }
 
@@ -97,16 +109,16 @@ export default async function handler(
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
-        const rawSub = sub as any;
-
-        const stripeCustomerId = rawSub.customer as string;
+        const stripeCustomerId =
+          typeof sub.customer === "string" ? sub.customer : sub.customer.id;
         const purchasedPriceId =
-          rawSub.items?.data?.[0]?.price?.id || null;
+          sub.items?.data?.[0]?.price?.id || null;
 
-        const status = rawSub.status;
+        const status = sub.status;
 
-        const current_period_end = rawSub.current_period_end
-          ? new Date(rawSub.current_period_end * 1000).toISOString()
+        const periodEnd = subscriptionPeriodEnd(sub);
+        const current_period_end = periodEnd
+          ? new Date(periodEnd * 1000).toISOString()
           : null;
 
         await supabaseAdmin

@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# StudySmart
 
-## Getting Started
+StudySmart is a K–12 learning platform built with the Next.js Pages Router, Supabase authentication, PostgreSQL/Prisma, and OpenAI. It connects learner profiles, diagnostics, concept mastery, tutoring, quizzes, flashcards, and spaced review while adapting language and challenge by grade band.
 
-First, run the development server:
+## Local development
+
+Install dependencies, apply database migrations, and start the app:
 
 ```bash
+npm install
+npx prisma migrate deploy
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Required environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Configure these server-side values in `.env` and in the production host:
 
-## Learn More
+```text
+DATABASE_URL=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+OPENAI_API_KEY=
+SAFETY_ENCRYPTION_KEY=
+AI_TRACE_HASH_KEY=
+CRON_SECRET=
+NEXT_PUBLIC_APP_URL=
 
-To learn more about Next.js, take a look at the following resources:
+# Durable guardian safety delivery
+RESEND_API_KEY=
+SAFETY_FROM_EMAIL=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_SAFETY_FROM_NUMBER=
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Optional retention override (7–90 days; default 30)
+SAFETY_DETAIL_RETENTION_DAYS=30
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+`SAFETY_ENCRYPTION_KEY`, `AI_TRACE_HASH_KEY`, and `CRON_SECRET` should be independent, long, randomly generated production secrets. Back up the encryption key separately and rotate it only through a planned data migration. Local development has compatibility fallbacks, but production should always set the dedicated keys. Email, SMS, and Web Push remain inactive until their provider credentials are configured.
 
-## Deploy on Vercel
+Stripe variables are also required when billing is enabled.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Verification
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Run the complete production and cleanup checks:
+
+```bash
+npm run check:all
+```
+
+This runs the safety, learning-model, interoperability, grounding, retention, and experimentation tests; builds the production app; and checks unused files, exports, and dependencies.
+
+## K–12 safety controls
+
+All AI input and output passes local rules plus OpenAI moderation. Prohibited learner requests are blocked; qualifying learner-originated attempts create a safety strike. Connected guardians and verified classroom teachers receive an encrypted, access-controlled alert containing the exact attempted request. Provider-backed email, SMS, and Web Push delivery retry durably and privacy-safe previews never include the request. The encrypted detail is automatically purged after the configured short retention window while the non-content safety event remains. The third strike pauses learning tools for 30 days, while the Trust Center, Community, privacy export, and appeal path remain available.
+
+Help-seeking disclosures, self-harm concerns, abuse disclosures, personal-information mistakes, and legitimate age-appropriate health or biology education are handled through protective guidance and do not create disciplinary strikes. Learner searches that indicate self-harm intent or seek ways to die create an urgent, guardian-only in-app alert with the exact request encrypted at rest; they never increase the learner's strike count or trigger a lockout.
+
+## Production launch gates
+
+The application includes technical controls and automated checks, but it does not self-certify legal or standards compliance. Before serving children in production, complete every gate in [docs/LAUNCH_SECURITY_CHECKLIST.md](docs/LAUNCH_SECURITY_CHECKLIST.md), including an independent penetration test, WCAG 2.2 audit, privacy/legal review, incident-response exercise, and any required 1EdTech certification.

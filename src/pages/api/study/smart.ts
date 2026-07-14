@@ -1,37 +1,34 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
+import { requireApiUser } from "@/lib/auth";
 
 export default async function handler(
-  _req: NextApiRequest, // underscore = intentionally unused
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const userId = "demo-user"; // TODO: replace with real session user
+  if (req.method !== "GET") {return res.status(405).end();}
 
+  const user = await requireApiUser(req, res);
+  if (!user) {return;}
+
+  const profile = await prisma.learnerProfile.findUnique({
+    where: { userId: user.id },
+    select: { dailyReviewLimit: true },
+  });
+  const limit = Math.max(5, Math.min(100, profile?.dailyReviewLimit ?? 20));
   const cards = await prisma.flashcard.findMany({
-    where: { user_id: userId },
-    include: {
-      reviews: {
-        orderBy: { reviewed_at: "desc" },
-        take: 5,
-      },
-    },
+    where: { userId: user.id, nextReviewAt: { lte: new Date() } },
+    orderBy: [{ nextReviewAt: "asc" }, { createdAt: "asc" }],
+    take: limit,
   });
-
-  const scored = cards.map((card) => {
-    const incorrect = card.reviews.filter((r) => !r.correct).length;
-    const lastReviewed = card.reviews[0]?.reviewed_at ?? new Date(0);
-
-    const hoursSince =
-      (Date.now() - lastReviewed.getTime()) / 1000 / 60 / 60;
-
-    const score = incorrect * 5 - Math.floor(hoursSince);
-
-    return { card, score };
-  });
-
-  scored.sort((a, b) => b.score - a.score);
 
   res.status(200).json({
-    cards: scored.slice(0, 20).map((s) => s.card),
+    dueCount: cards.length,
+    cards: cards.map((card) => ({
+      id: card.id,
+      question: card.question,
+      answer: card.answer,
+      nextReviewAt: card.nextReviewAt,
+    })),
   });
 }

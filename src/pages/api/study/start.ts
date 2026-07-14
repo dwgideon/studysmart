@@ -1,92 +1,49 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
-
-/**
- * Local type for flashcards + reviews
- * (avoids Prisma client type import issues)
- */
-type FlashcardWithReviews = {
-  id: string;
-  question: string;
-  answer: string;
-  created_at: Date;
-  reviews: {
-    correct: boolean;
-  }[];
-};
+import { requireApiUser } from "@/lib/auth";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== "POST") return res.status(405).end();
+  if (req.method !== "POST") {
+    return res.status(405).end();
+  }
 
-  const userId = "demo-user"; // TEMP USER
+  const user = await requireApiUser(req, res);
+  if (!user) {
+    return;
+  }
 
-  /**
-   * 1️⃣ Fetch flashcards with review history
-   */
-  const cards = (await prisma.flashcard.findMany({
-    where: { user_id: userId },
-    include: { reviews: true },
-  })) as FlashcardWithReviews[];
+  try {
+    const cards = await prisma.flashcard.findMany({
+      where: { userId: user.id, nextReviewAt: { lte: new Date() } },
+      orderBy: [{ nextReviewAt: "asc" }, { createdAt: "asc" }],
+      take: 20,
+      include: { concept: { select: { courseId: true } } },
+    });
 
-  /**
-   * 2️⃣ Score cards by difficulty
-   */
-  const scoredCards = cards.map((card: FlashcardWithReviews) => {
-    const total = card.reviews.length;
-    const correct = card.reviews.filter(
-      (r: { correct: boolean }) => r.correct
-    ).length;
-
-    const accuracy = total === 0 ? 0 : correct / total;
-
-    return {
-      ...card,
-      accuracy,
-      totalReviews: total,
-    };
-  });
-
-  /**
-   * 3️⃣ Sort by difficulty
-   */
-  scoredCards.sort(
-    (
-      a: { accuracy: number; totalReviews: number },
-      b: { accuracy: number; totalReviews: number }
-    ) => {
-      if (a.totalReviews === 0 && b.totalReviews > 0) return -1;
-      if (b.totalReviews === 0 && a.totalReviews > 0) return 1;
-      return a.accuracy - b.accuracy;
+    if (cards.length === 0) {
+      return res.status(400).json({
+        error: "No cards are due right now. Check back after your next review time.",
+      });
     }
-  );
 
-  /**
-   * 4️⃣ Select cards for session
-   */
-  const sessionCards = scoredCards.slice(0, 20);
+    const session = await prisma.studySession.create({
+      data: {
+        userId: user.id,
+        courseId: cards.find((card) => card.concept)?.concept?.courseId ?? null,
+        title: cards[0]?.question.slice(0, 72) ?? "Study session",
+        totalCards: cards.length,
+      },
+    });
 
-  /**
-   * 5️⃣ Create study session
-   */
-  const session = await prisma.study_sessions.create({
-    data: {
-      user_id: userId,
-      total_cards: sessionCards.length,
-      correct: 0,
-      incorrect: 0,
-    },
-  });
-
-  /**
-   * 6️⃣ Return clean payload (no reviews)
-   */
-  return res.status(200).json({
-    sessionId: session.id,
-    cards: sessionCards.map(
-      ({ reviews, accuracy, totalReviews, ...card }) => card
-    ),
-  });
+    return res.status(200).json({
+      sessionId: session.id,
+      cards,
+    });
+  } catch (error) {
+    console.error("study/start error:", error);
+    return res.status(500).json({ error: "Failed to start study session" });
+  }
 }

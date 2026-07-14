@@ -1,31 +1,32 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
+import { requireApiUser } from "@/lib/auth";
 
 export default async function handler(
-  _req: NextApiRequest, // underscore = intentionally unused
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const userId = "demo-user"; // TEMP until auth wiring
+  if (req.method !== "GET") {return res.status(405).end();}
+
+  const user = await requireApiUser(req, res);
+  if (!user) {return;}
 
   const totalCards = await prisma.flashcard.count({
-    where: { user_id: userId },
+    where: { userId: user.id },
   });
 
-  const totalReviews = await prisma.cardReview.count({
-    where: {
-      flashcard: { user_id: userId },
-    },
+  const reviews = await prisma.cardReview.findMany({
+    where: { userId: user.id },
+    select: { correct: true },
   });
 
-  const correctReviews = await prisma.cardReview.count({
-    where: {
-      flashcard: { user_id: userId },
-      correct: true,
-    },
-  });
+  const totalReviews = reviews.length;
+  const correctReviews = reviews.filter((r) => r.correct).length;
 
   const accuracy =
-    totalReviews === 0 ? 0 : Math.round((correctReviews / totalReviews) * 100);
+    totalReviews === 0
+      ? 0
+      : Math.round((correctReviews / totalReviews) * 100);
 
   res.status(200).json({
     totalCards,

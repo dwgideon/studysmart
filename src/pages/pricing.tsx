@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import styles from './Pricing.module.css';
 import { supabase } from '../lib/supabaseClient';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 
 type PlanKey = 'starter' | 'pro' | 'unlimited';
 
@@ -44,7 +44,12 @@ const PLANS: Plan[] = [
 ];
 
 export default function Pricing() {
+  const [loadingPlan, setLoadingPlan] = useState<PlanKey | null>(null);
+  const [message, setMessage] = useState('');
+
   const handleCheckout = useCallback(async (planKey: PlanKey) => {
+    setMessage('');
+    setLoadingPlan(planKey);
     const { data } = await supabase.auth.getSession();
     const user = data.session?.user;
     if (!user) {
@@ -63,9 +68,15 @@ export default function Pricing() {
     });
 
     const json = await res.json();
-    if (json.url) window.location.href = json.url;
-    else alert(json.error || 'Checkout error');
+    setLoadingPlan(null);
+    if (json.url) {window.location.href = json.url;}
+    else {setMessage(json.error || 'Checkout error');}
   }, []);
+
+  const status =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('status')
+      : null;
 
   return (
     <div className={styles.wrap}>
@@ -74,6 +85,10 @@ export default function Pricing() {
       <section className={styles.header}>
         <h1>Simple, affordable pricing</h1>
         <p>Start with Starter, scale to Pro, or go Unlimited with a fair-use cap.</p>
+        {status === 'cancel' && (
+          <p style={{ color: '#b45309' }}>Checkout cancelled. Pick a plan when you are ready.</p>
+        )}
+        {message && <p style={{ color: '#dc2626' }}>{message}</p>}
       </section>
 
       <section className={styles.cards}>
@@ -90,8 +105,12 @@ export default function Pricing() {
             <ul className={styles.list}>
               {p.features.map((f, i) => <li key={i}>{f}</li>)}
             </ul>
-            <button className={styles.cta} onClick={() => handleCheckout(p.key)}>
-              Choose {p.name}
+            <button
+              className={styles.cta}
+              disabled={loadingPlan !== null}
+              onClick={() => handleCheckout(p.key)}
+            >
+              {loadingPlan === p.key ? 'Redirecting…' : `Choose ${p.name}`}
             </button>
           </div>
         ))}
