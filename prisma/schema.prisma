@@ -59,8 +59,56 @@ model User {
   experimentEvents        ExperimentEvent[]
   organizationsCreated    Organization[]           @relation("OrganizationCreator")
   organizationMemberships OrganizationMembership[]
+  gameProfile             GameProfile?
+  gameRuns                GameRun[]
+  avatarItems             AvatarItemOwnership[]
 
   @@index([email])
+}
+
+model GameProfile {
+  userId         String   @id @db.Uuid
+  sparks         Int      @default(0)
+  lifetimeSparks Int      @default(0)
+  equippedHair   String   @default("hair_starter")
+  equippedTop    String   @default("top_starter")
+  equippedExtra  String   @default("extra_none")
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AvatarItemOwnership {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @db.Uuid
+  itemId     String
+  acquiredAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId])
+  @@index([userId])
+}
+
+model GameRun {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String    @db.Uuid
+  mode           String
+  project        String?
+  questions      Json
+  answers        Json
+  currentIndex   Int       @default(0)
+  score          Int       @default(0)
+  xpEarned       Int       @default(0)
+  sparksEarned   Int       @default(0)
+  rewardsEnabled Boolean   @default(true)
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, completedAt])
 }
 
 model LearnerProfile {
