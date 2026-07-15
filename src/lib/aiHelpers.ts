@@ -2,6 +2,7 @@
 import { openai } from "./openai";
 import { parseAiJson } from "./parseAiJson";
 import { K12_SAFETY_PROMPT, moderateK12Content } from "./childSafety";
+import { generateLocalFlashcards, isAiFreeTestMode } from "./aiFreeTestMode";
 
 type GeneratedFlashcard = {
   front: string;
@@ -23,6 +24,9 @@ export async function generateFlashcardsFromText(
   text: string,
   userId: string
 ): Promise<GeneratedFlashcard[]> {
+  if (isAiFreeTestMode) {
+    return generateLocalFlashcards(text, 8);
+  }
   const instructions = `${K12_SAFETY_PROMPT}\n\nYou are a flashcard generator for K–12 students.
 - Generate 5 concise flashcards from the provided content.
 - Format the result as an array of JSON objects.

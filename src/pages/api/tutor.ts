@@ -12,6 +12,7 @@ import {
 } from "@/lib/childSafety";
 import { retrieveSourceChunks } from "@/lib/sourceIngestion";
 import { recordAiTrace } from "@/lib/aiObservability";
+import { isAiFreeTestMode, localGroundedTutorReply } from "@/lib/aiFreeTestMode";
 
 const TUTOR_MODEL = "gpt-4o-mini";
 const TUTOR_PROMPT_VERSION = "k12-grounded-v3";
@@ -59,7 +60,9 @@ export default async function handler(
   }
 
   try {
-    const access = await aiAccessForUser(user.id);
+    const access = isAiFreeTestMode
+      ? { allowed: true, reason: "AI_FREE_TEST", districtPolicy: { externalKnowledgeEnabled: true } } as const
+      : await aiAccessForUser(user.id);
     if (!access.allowed) {
       return res.status(428).json({
         error: access.reason,
@@ -175,19 +178,20 @@ export default async function handler(
         ? "No study material is available. Clearly say that before offering any general guidance, and label that guidance as general knowledge."
         : "Answer from general knowledge. Do not imply that the answer came from the learner's uploaded material.";
     const modelStartedAt = Date.now();
-    const completion = await openai.chat.completions.create({
-      model: TUTOR_MODEL,
-      temperature: 0.4,
-      max_tokens: 500,
-      messages: [
-        {
-          role: "system",
-          content: `${K12_SAFETY_PROMPT}\n\n${tutorPromptForGrade(learnerProfile?.gradeLevel ?? "6")}\n\nUse questions and hints before giving a complete answer when that supports learning. Never shame mistakes.\n\n${sourceInstruction}`,
-        },
-        ...messages,
-      ],
-    });
-    const generatedReply = completion.choices[0].message.content ?? "I could not form a response.";
+    const generatedReply = isAiFreeTestMode
+      ? localGroundedTutorReply({ question: latestUserMessage.content, sourceMode, chunks: groundedChunks })
+      : (await openai.chat.completions.create({
+          model: TUTOR_MODEL,
+          temperature: 0.4,
+          max_tokens: 500,
+          messages: [
+            {
+              role: "system",
+              content: `${K12_SAFETY_PROMPT}\n\n${tutorPromptForGrade(learnerProfile?.gradeLevel ?? "6")}\n\nUse questions and hints before giving a complete answer when that supports learning. Never shame mistakes.\n\n${sourceInstruction}`,
+            },
+            ...messages,
+          ],
+        })).choices[0].message.content ?? "I could not form a response.";
     const outputSafety = await moderateK12Content(
       user.id,
       generatedReply,
@@ -221,8 +225,8 @@ export default async function handler(
       userId: user.id,
       analyticsEnabled: privacySettings?.productAnalyticsEnabled === true,
       feature: "TUTOR",
-      model: TUTOR_MODEL,
-      promptVersion: TUTOR_PROMPT_VERSION,
+      model: isAiFreeTestMode ? "local-deterministic" : TUTOR_MODEL,
+      promptVersion: isAiFreeTestMode ? "ai-free-test-v1" : TUTOR_PROMPT_VERSION,
       input: latestUserMessage.content,
       output: reply,
       latencyMs: Date.now() - modelStartedAt,
@@ -264,6 +268,6 @@ export default async function handler(
     });
   } catch (error) {
     console.error("Tutor error:", error);
-    return res.status(500).json({ reply: "AI tutor failed to respond." });
+    return res.status(500).json({ reply: isAiFreeTestMode ? "The local test tutor could not respond." : "AI tutor failed to respond." });
   }
 }

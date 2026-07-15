@@ -7,6 +7,7 @@ import {
   type ChunkedSourcePart,
   type SourceSegment,
 } from "@/lib/sourceChunking";
+import { AI_FREE_SAMPLE_LESSON, isAiFreeTestMode } from "@/lib/aiFreeTestMode";
 
 const MAX_SOURCE_CHARS = 180_000;
 const MAX_CHUNKS = 160;
@@ -129,6 +130,7 @@ async function extractAudio(buffer: Buffer, fileName: string, mimeType: string) 
 
 async function embedChunks(chunks: ChunkedSourcePart[]) {
   if (chunks.length === 0) {return [] as Array<number[] | null>;}
+  if (isAiFreeTestMode) {return chunks.map(() => null);}
   try {
     const response = await openai.embeddings.create({
       model: process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small",
@@ -160,6 +162,10 @@ export async function ingestStudySource(input: {
       if (!text) {throw new UnsupportedStudyFileError("The uploaded text file is empty.");}
       segments.push({ text, section: fileName });
       methods.push("TEXT");
+    } else if (isAiFreeTestMode && (IMAGE_TYPES.has(mimeType) || DOCUMENT_TYPES.has(mimeType) || AUDIO_TYPES.has(mimeType))) {
+      segments.push({ text: AI_FREE_SAMPLE_LESSON, section: `${fileName} · simulated extraction` });
+      warnings.push("AI-free test mode simulated text extraction for this binary file. Use pasted text or TXT to test with your exact content without AI.");
+      methods.push("LOCAL_TEST_SIMULATION");
     } else if (IMAGE_TYPES.has(mimeType) || DOCUMENT_TYPES.has(mimeType)) {
       const extracted = await extractVisualOrDocument(buffer, fileName, mimeType);
       segments.push(...extracted.segments);
@@ -246,7 +252,7 @@ export async function retrieveSourceChunks(input: {
   });
   if (chunks.length === 0) {return [];}
   let queryEmbedding: number[] | null = null;
-  if (chunks.some((chunk) => Array.isArray(chunk.embedding))) {
+  if (!isAiFreeTestMode && chunks.some((chunk) => Array.isArray(chunk.embedding))) {
     try {
       const response = await openai.embeddings.create({
         model: process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small",

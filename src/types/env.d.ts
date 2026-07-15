@@ -35,6 +35,7 @@ declare namespace NodeJS {
     OPENAI_EMBEDDING_MODEL?: string;
     OPENAI_MULTIMODAL_MODEL?: string;
     OPENAI_TRANSCRIPTION_MODEL?: string;
+    AI_FREE_TEST_MODE?: string;
     GROQ_API_KEY?: string;
   }
 }

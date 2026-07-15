@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { openai } from "@/lib/openai";
+import { isAiFreeTestMode } from "@/lib/aiFreeTestMode";
 import { prisma } from "@/lib/prisma";
 import {
   decryptSensitiveValue,
@@ -333,6 +334,9 @@ export async function moderateK12Content(
 ): Promise<SafetyDecision> {
   const local = localK12SafetyDecision(content);
   if (local) {return recordSafetyEvent(userId, source, local, content);}
+  if (isAiFreeTestMode) {
+    return { allowed: true, category: "SAFE_LOCAL_TEST", severity: "LOW" };
+  }
 
   let categories: Record<string, boolean>;
   try {

@@ -8,6 +8,7 @@ import fs from "fs";
 import { createHash } from "crypto";
 import { aiAccessForUser, moderateK12Content } from "@/lib/childSafety";
 import { isOpenAIConfigured } from "@/lib/openai";
+import { isAiFreeTestMode } from "@/lib/aiFreeTestMode";
 import {
   ingestStudySource,
   UnsupportedStudyFileError,
@@ -35,7 +36,7 @@ export default async function handler(
   }
   const user = await requireApiUser(req, res);
   if (!user) {return;}
-  if (!isOpenAIConfigured) {
+  if (!isAiFreeTestMode && !isOpenAIConfigured) {
     return res.status(503).json({
       code: "AI_NOT_CONFIGURED",
       error: "Study generation is temporarily unavailable. The deployment is missing its AI service configuration.",
@@ -58,12 +59,12 @@ export default async function handler(
       return res.status(400).json({ error: "Missing content" });
     }
 
-    const access = await aiAccessForUser(userId);
-    if (!access.allowed) {return res.status(428).json({ error: access.reason });}
+    const access = isAiFreeTestMode ? null : await aiAccessForUser(userId);
+    if (access && !access.allowed) {return res.status(428).json({ error: access.reason });}
     const textLikeUpload = !uploaded ||
       uploaded.mimetype?.startsWith("text/") ||
       ["application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.presentationml.presentation"].includes(uploaded.mimetype ?? "");
-    if (!access.districtPolicy.multimodalEnabled && !textLikeUpload) {
+    if (access?.allowed && !access.districtPolicy.multimodalEnabled && !textLikeUpload) {
       return res.status(403).json({
         error: "Your school or district has disabled image, audio, and video processing.",
       });

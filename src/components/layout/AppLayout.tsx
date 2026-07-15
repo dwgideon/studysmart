@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/router";
 import Header from "@/components/Header";
 import layout from "@/styles/layout.module.css";
+import TestModeBanner from "@/components/TestModeBanner";
 
 type Props = {
   children: React.ReactNode;
@@ -25,6 +26,7 @@ export default function AppLayout({ children }: Props) {
         Skip to main content
       </a>
       <Header />
+      <TestModeBanner />
       <main id="main-content" className={layout.mainContent} tabIndex={-1} aria-label="Main content">
         {children}
       </main>

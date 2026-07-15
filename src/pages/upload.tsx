@@ -5,6 +5,7 @@ import { useRouter } from "next/router";
 import RequireAuth from "@/components/RequireAuth";
 import styles from "./Upload.module.css";
 import Link from "next/link";
+import { AI_FREE_SAMPLE_LESSON } from "@/lib/aiFreeTestMode";
 
 export default function UploadPage() {
   return (
@@ -99,6 +100,10 @@ function UploadForm() {
             onChange={(e) => setText(e.target.value)}
           />
         </label>
+
+        <button type="button" className={styles.sampleButton} onClick={() => {setText(AI_FREE_SAMPLE_LESSON); setFile(null); setError("");}}>
+          Use water-cycle test lesson
+        </button>
 
         <div className={styles.fileRow}>
           <label className={styles.fileLabel}>

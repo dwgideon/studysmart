@@ -18,6 +18,7 @@ import {
   type DiagnosticQuestion,
   type DiagnosticResponse,
 } from "@/lib/diagnostic";
+import { isAiFreeTestMode } from "@/lib/aiFreeTestMode";
 
 const QUESTION_COUNT = 6;
 
@@ -70,10 +71,11 @@ async function startDiagnostic(userId: string, res: NextApiResponse) {
     return res.status(409).json({ error: "Complete your learning profile first." });
   }
 
-  let questions: DiagnosticQuestion[] = [];
-  const access = await aiAccessForUser(userId);
-  try {
-    if (!access.allowed) {throw new Error(access.reason);}
+  let questions: DiagnosticQuestion[] = isAiFreeTestMode ? fallbackDiagnostic(profile.gradeLevel) : [];
+  if (!isAiFreeTestMode) {
+    const access = await aiAccessForUser(userId);
+    try {
+      if (!access.allowed) {throw new Error(access.reason);}
     const context = `Grade: ${profile.gradeLevel}. Course: ${course.name}. Subject: ${course.subject}. Learning goal: ${course.learningGoal ?? profile.primaryLearningGoal ?? "build mastery"}.`;
     const contextSafety = await moderateK12Content(userId, context, "DIAGNOSTIC_CONTEXT");
     if (!contextSafety.allowed) {throw new Error("Unsafe diagnostic context");}
@@ -96,9 +98,10 @@ async function startDiagnostic(userId: string, res: NextApiResponse) {
     const raw = completion.choices[0].message.content;
     const outputSafety = await moderateK12Content(userId, raw ?? "", "DIAGNOSTIC_OUTPUT");
     if (!outputSafety.allowed) {throw new Error("Unsafe diagnostic output");}
-    questions = validateDiagnosticQuestions(parseAiJson(raw));
-  } catch (error) {
-    console.warn("Using fallback diagnostic:", error);
+      questions = validateDiagnosticQuestions(parseAiJson(raw));
+    } catch (error) {
+      console.warn("Using fallback diagnostic:", error);
+    }
   }
   if (questions.length < QUESTION_COUNT) {
     questions = fallbackDiagnostic(profile.gradeLevel);
