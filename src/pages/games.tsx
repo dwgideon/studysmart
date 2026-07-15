@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import RequireAuth from "../components/RequireAuth";
 import type { AvatarItem, AvatarSlot, GameMode } from "@/lib/gameEconomy";
+import type { Companion } from "@/lib/learningCompanions";
+import { companionGreeting } from "@/lib/learningCompanions";
+import TalkingCompanion from "@/components/TalkingCompanion";
 import styles from "@/styles/Games.module.css";
 
 type Avatar = { hair: string; top: string; extra: string };
@@ -14,6 +17,7 @@ type Hub = {
   catalog: AvatarItem[];
   leaderboard: { rank: number; name: string; xp: number }[];
   recentRuns: { id: string; mode: GameMode; project: string | null; score: number; xpEarned: number; sparksEarned: number }[];
+  experience: { gradeLevel: string; gradeBand: "EARLY" | "ELEMENTARY" | "MIDDLE" | "HIGH"; companion: Companion; companions: Companion[]; readAloud: boolean; speechRate: number };
 };
 type Run = { runId: string; mode: GameMode; project: string | null; rewardsEnabled: boolean; questions: GameQuestion[] };
 type AnswerResult = {
@@ -46,7 +50,8 @@ function GameWorld() {
   const [answered, setAnswered] = useState<Record<number, AnswerResult>>({});
   const [materials, setMaterials] = useState<Record<string, number>>({});
   const [selectedProject, setSelectedProject] = useState(projects[0].id);
-  const [tab, setTab] = useState<"play" | "avatar" | "ranks">("play");
+  const [tab, setTab] = useState<"play" | "companion" | "avatar" | "ranks">("play");
+  const [voiceSessionOn, setVoiceSessionOn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -99,11 +104,13 @@ function GameWorld() {
   const current = selectedQuestion === null ? null : run?.questions[selectedQuestion];
   const currentResult = selectedQuestion === null ? undefined : answered[selectedQuestion];
   const owned = new Set(hub.owned);
+  const elementaryMode = hub.experience.gradeBand === "EARLY" || hub.experience.gradeBand === "ELEMENTARY";
+  const greeting = companionGreeting(hub.experience.companion, hub.player.name, hub.experience.gradeBand === "EARLY");
 
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${elementaryMode ? styles.elementaryPage : styles.olderPage}`}>
       <section className={styles.hero}>
-        <div><p className={styles.eyebrow}>STUDYSMART GAME WORLD</p><h1>Learn it. Build it.<br/><span>Make it yours.</span></h1><p>Every right answer moves your knowledge—and your world—forward.</p></div>
+        <div><p className={styles.eyebrow}>{elementaryMode ? "YOUR LEARNING ADVENTURE" : "STUDYSMART GAME WORLD"}</p><h1>{elementaryMode ? <>Learn. Play.<br/><span>Grow together!</span></> : <>Learn it. Build it.<br/><span>Make it yours.</span></>}</h1><p>{elementaryMode ? `${hub.experience.companion.name} can read every question out loud while you follow the words.` : "Every right answer moves your knowledge—and your world—forward."}</p></div>
         <div className={styles.playerCard}>
           <AvatarView avatar={hub.avatar} catalog={hub.catalog} />
           <div><span>LEVEL {hub.player.level}</span><strong>{hub.player.name}</strong><div className={styles.xpTrack}><i style={{ width: `${hub.player.xp % 100}%` }} /></div><small>{hub.player.xp % 100} / 100 XP to next level</small></div>
@@ -112,11 +119,12 @@ function GameWorld() {
       </section>
 
       <nav className={styles.tabs} aria-label="Game World sections">
-        {([['play','Game Arcade'],['avatar','Avatar Studio'],['ranks','League']] as const).map(([id,label]) => <button key={id} className={tab === id ? styles.activeTab : ""} onClick={() => setTab(id)}>{label}</button>)}
+        {([['play',elementaryMode ? 'Play & Learn' : 'Game Arcade'],['companion',elementaryMode ? 'My Talking Buddy' : 'Companion'],['avatar','Avatar Studio'],['ranks','League']] as const).map(([id,label]) => <button key={id} className={tab === id ? styles.activeTab : ""} onClick={() => setTab(id)}>{label}</button>)}
       </nav>
       {message && <div className={styles.notice} role="alert">{message}<button onClick={() => setMessage("")} aria-label="Dismiss">×</button></div>}
 
       {tab === "play" && !run && <section className={styles.arcade}>
+        {elementaryMode && <div className={styles.companionWelcome}><TalkingCompanion companion={hub.experience.companion} text={greeting} speechRate={hub.experience.speechRate} autoRead={voiceSessionOn && hub.experience.readAloud} autoKey={`welcome-${voiceSessionOn}`} /><button className={styles.voiceStart} onClick={() => setVoiceSessionOn((current) => !current)}>{voiceSessionOn ? "🔇 Turn off automatic reading" : `🔊 Start ${hub.experience.companion.name}’s voice`}</button><p>The words always stay on screen. You can pause, replay, or turn the voice off any time.</p></div>}
         <article className={`${styles.modeCard} ${styles.gridCard}`}>
           <div className={styles.cardGlow} /><p className={styles.modeTag}>KNOWLEDGE GRID</p><h2>Choose your challenge.</h2><p>Pick a category and point value. Master harder questions for bigger rewards.</p>
           <div className={styles.miniBoard}>{[100,200,300,400,500,600].map((value) => <span key={value}>{value}</span>)}</div>
@@ -134,9 +142,10 @@ function GameWorld() {
       {tab === "play" && run?.mode === "BUILD" && <BuildLab run={run} answered={answered} materials={materials} project={selectedProject} />}
 
       {tab === "avatar" && <AvatarStudio hub={hub} owned={owned} setHub={setHub} setMessage={setMessage} />}
+      {tab === "companion" && <CompanionCove hub={hub} elementaryMode={elementaryMode} voiceSessionOn={voiceSessionOn} setVoiceSessionOn={setVoiceSessionOn} setHub={setHub} setMessage={setMessage} />}
       {tab === "ranks" && <League hub={hub} />}
 
-      {current && <QuestionModal question={current} result={currentResult} busy={busy} rewardsEnabled={Boolean(run?.rewardsEnabled)} onAnswer={answer} onContinue={closeQuestion} />}
+      {current && <QuestionModal question={current} result={currentResult} busy={busy} rewardsEnabled={Boolean(run?.rewardsEnabled)} companion={hub.experience.companion} speechRate={hub.experience.speechRate} autoRead={elementaryMode && hub.experience.readAloud && voiceSessionOn} onAnswer={answer} onContinue={closeQuestion} />}
     </main>
   );
 }
@@ -156,8 +165,23 @@ function BuildLab({ run, answered, materials, project }: { run: Run; answered: R
   return <section className={styles.gameStage}><header><button className={styles.backButton} onClick={() => window.location.reload()}>← Exit lab</button><div><p className={styles.eyebrow}>BUILD LAB · {project.toUpperCase()}</p><h2>Construction in progress</h2></div><div className={styles.roundScore}><span>{complete}</span> parts earned</div></header>{!run.rewardsEnabled && <p className={styles.practiceNote}>Practice build: today’s reward limit is reached, but the project can still be completed.</p>}<div className={styles.lab}><div className={styles.blueprint}><div className={styles.scanline}/><div className={styles.structure} data-project={project} style={{ "--build-progress": `${Math.max(10, progress)}%` } as React.CSSProperties}><span>✦</span><i/><b>{project}</b></div><div className={styles.progress}><span style={{ width: `${progress}%` }}/></div><small>Blueprint {progress}% assembled</small></div><div className={styles.materialPanel}><h3>Material bay</h3>{["Timber","Alloy","Energy","Glass"].map((material) => <div key={material}><i className={styles[`material${material}`]}/><span>{material}</span><b>{materials[material] || 0}</b></div>)}<p>{Object.keys(answered).length < run.questions.length ? "Answer the active challenge to fabricate the next part." : progress === 100 ? "Perfect build! Every part is assembled." : "Round complete. Replay to upgrade the unfinished sections."}</p></div></div></section>;
 }
 
-function QuestionModal({ question, result, busy, rewardsEnabled, onAnswer, onContinue }: { question: GameQuestion; result?: AnswerResult; busy: boolean; rewardsEnabled: boolean; onAnswer: (choice: number) => void; onContinue: () => void }) {
-  return <div className={styles.modalBackdrop} role="presentation"><section className={styles.questionModal} role="dialog" aria-modal="true" aria-labelledby="question-title"><div className={styles.questionMeta}><span>{question.category}</span><b>{question.value} points</b></div><h2 id="question-title">{question.prompt}</h2><div className={styles.answers}>{question.options.map((option,index) => <button key={`${option}-${index}`} disabled={busy || Boolean(result)} className={result ? (index === result.correctIndex ? styles.correctAnswer : "") : ""} onClick={() => onAnswer(index)}><span>{String.fromCharCode(65+index)}</span>{option}</button>)}</div>{result && <div className={result.correct ? styles.successResult : styles.reviewResult}><div><b>{result.correct ? "Brilliant connection!" : "Good attempt—now lock it in."}</b><p>{result.correct ? "Your progress and rewards were saved." : `Correct answer: ${result.correctAnswer}`}</p></div>{rewardsEnabled && result.correct && <span>+{result.reward.xp} XP&nbsp;&nbsp; +{result.reward.sparks} ✦</span>}<button onClick={onContinue}>{result.finished ? "Finish mission" : "Continue"} →</button></div>}</section></div>;
+function QuestionModal({ question, result, busy, rewardsEnabled, companion, speechRate, autoRead, onAnswer, onContinue }: { question: GameQuestion; result?: AnswerResult; busy: boolean; rewardsEnabled: boolean; companion: Companion; speechRate: number; autoRead: boolean; onAnswer: (choice: number) => void; onContinue: () => void }) {
+  const questionSpeech = `Here is your question. ${question.prompt}. Your choices are: ${question.options.map((option, index) => `${String.fromCharCode(65 + index)}, ${option}`).join(". ")}.`;
+  const feedbackSpeech = result ? (result.correct ? `You got it! Great thinking. You earned ${result.reward.xp} experience points and ${result.reward.sparks} Sparks.` : `Nice try. The correct answer is ${result.correctAnswer}. Mistakes help your brain grow.`) : questionSpeech;
+  return <div className={styles.modalBackdrop} role="presentation"><section className={styles.questionModal} role="dialog" aria-modal="true" aria-labelledby="question-title"><TalkingCompanion companion={companion} text={feedbackSpeech} speechRate={speechRate} autoRead={autoRead} autoKey={`${question.cardId}-${result ? (result.correct ? "correct" : "review") : "question"}`} compact/><div className={styles.questionMeta}><span>{question.category}</span><b>{question.value} points</b></div><h2 id="question-title">{question.prompt}</h2><div className={styles.answers}>{question.options.map((option,index) => <button key={`${option}-${index}`} disabled={busy || Boolean(result)} className={result ? (index === result.correctIndex ? styles.correctAnswer : "") : ""} onClick={() => onAnswer(index)}><span>{String.fromCharCode(65+index)}</span>{option}</button>)}</div>{result && <div className={result.correct ? styles.successResult : styles.reviewResult}><div><b>{result.correct ? "Brilliant connection!" : "Good attempt—now lock it in."}</b><p>{result.correct ? "Your progress and rewards were saved." : `Correct answer: ${result.correctAnswer}`}</p></div>{rewardsEnabled && result.correct && <span>+{result.reward.xp} XP&nbsp;&nbsp; +{result.reward.sparks} ✦</span>}<button onClick={onContinue}>{result.finished ? "Finish mission" : "Continue"} →</button></div>}</section></div>;
+}
+
+function CompanionCove({ hub, elementaryMode, voiceSessionOn, setVoiceSessionOn, setHub, setMessage }: { hub: Hub; elementaryMode: boolean; voiceSessionOn: boolean; setVoiceSessionOn: (value: boolean) => void; setHub: (hub: Hub) => void; setMessage: (message: string) => void }) {
+  const choices = hub.experience.companions.filter((companion) => companion.elementary === elementaryMode);
+  const save = async (updates: Partial<Pick<Hub["experience"], "companion" | "readAloud" | "speechRate">>) => {
+    const next = { ...hub.experience, ...updates };
+    const response = await fetch("/api/games/companion", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ companionId: next.companion.id, readAloud: next.readAloud, speechRate: next.speechRate }) });
+    const data = await response.json();
+    if (!response.ok) {setMessage(data.error || "Your companion could not be updated."); return;}
+    setHub({ ...hub, experience: next });
+  };
+  const greeting = companionGreeting(hub.experience.companion, hub.player.name, hub.experience.gradeBand === "EARLY");
+  return <section className={styles.companionCove}><div className={styles.coveStage}><p className={styles.eyebrow}>{elementaryMode ? "COMPANION COVE" : "COMPANION NETWORK"}</p><h2>{elementaryMode ? "Pick your learning buddy" : "Choose your mission guide"}</h2><TalkingCompanion companion={hub.experience.companion} text={greeting} speechRate={hub.experience.speechRate} autoRead={voiceSessionOn && hub.experience.readAloud} autoKey={`${hub.experience.companion.id}-${voiceSessionOn}`} /><button className={styles.voiceStart} onClick={() => setVoiceSessionOn(!voiceSessionOn)}>{voiceSessionOn ? "🔇 Stop automatic reading" : "🔊 Turn on voice for this visit"}</button></div><div className={styles.companionSettings}><h3>Choose a buddy</h3><div className={styles.companionChoices}>{choices.map((companion) => <button key={companion.id} className={hub.experience.companion.id === companion.id ? styles.selectedCompanion : ""} onClick={() => save({ companion })}><span style={{ background: `linear-gradient(145deg, ${companion.accent}, ${companion.color})` }}>{companion.emoji}</span><b>{companion.name} the {companion.animal}</b><small>{companion.trait}</small></button>)}</div><fieldset><legend>Reading voice</legend><label><input type="checkbox" checked={hub.experience.readAloud} onChange={(event) => save({ readAloud: event.target.checked })}/><span>Read new questions automatically after I turn voice on</span></label><label><span>Voice speed</span><select value={hub.experience.speechRate} onChange={(event) => save({ speechRate: Number(event.target.value) })}><option value="0.7">Slow and steady</option><option value="0.9">Just right</option><option value="1.1">A little faster</option></select></label><p>StudySmart uses your device’s voice. Question text is not sent to another voice service.</p></fieldset></div></section>;
 }
 
 function AvatarStudio({ hub, owned, setHub, setMessage }: { hub: Hub; owned: Set<string>; setHub: (hub: Hub) => void; setMessage: (message: string) => void }) {
