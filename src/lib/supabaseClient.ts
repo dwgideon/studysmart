@@ -1,6 +1,6 @@
-import { createClient } from "@supabase/supabase-js";
+import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Use the Pages Router cookie adapter so browser sessions are available to
+// createPagesServerClient in protected API routes. A localStorage-only client
+// makes the UI appear signed in while every server request returns 401.
+export const supabase = createPagesBrowserClient();
