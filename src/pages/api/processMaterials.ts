@@ -7,6 +7,7 @@ import formidable from "formidable";
 import fs from "fs";
 import { createHash } from "crypto";
 import { aiAccessForUser, moderateK12Content } from "@/lib/childSafety";
+import { isOpenAIConfigured } from "@/lib/openai";
 import {
   ingestStudySource,
   UnsupportedStudyFileError,
@@ -34,6 +35,12 @@ export default async function handler(
   }
   const user = await requireApiUser(req, res);
   if (!user) {return;}
+  if (!isOpenAIConfigured) {
+    return res.status(503).json({
+      code: "AI_NOT_CONFIGURED",
+      error: "Study generation is temporarily unavailable. The deployment is missing its AI service configuration.",
+    });
+  }
 
   try {
     const form = formidable({
