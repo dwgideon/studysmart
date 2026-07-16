@@ -1,10 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
 import { prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
 import { recordMasteryEvidence } from "@/lib/masteryService";
 import { scheduleNextReview } from "@/lib/spacedRepetition";
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -128,3 +129,5 @@ export default async function handler(
     return res.status(500).json({ error: "Failed to record review" });
   }
 }
+
+export default withApiMonitoring("api.study.review", handler);

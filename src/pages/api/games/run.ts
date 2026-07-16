@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
@@ -106,7 +107,7 @@ async function answerQuestion(userId: string, runId: string, questionIndex: numb
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {return res.status(405).end();}
   const user = await requireApiUser(req, res);
   if (!user) {return;}
@@ -128,3 +129,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "The game could not continue. Please try again." });
   }
 }
+
+export default withApiMonitoring("api.games.run", handler);

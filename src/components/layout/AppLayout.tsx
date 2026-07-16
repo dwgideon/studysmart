@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useRouter } from "next/router";
+import Link from "next/link";
 import Header from "@/components/Header";
 import layout from "@/styles/layout.module.css";
 import TestModeBanner from "@/components/TestModeBanner";
@@ -30,6 +31,15 @@ export default function AppLayout({ children }: Props) {
       <main id="main-content" className={layout.mainContent} tabIndex={-1} aria-label="Main content">
         {children}
       </main>
+      <footer className={layout.footer} aria-label="Policies and support">
+        <span>StudySmart · K–12 learning with privacy and safety by design</span>
+        <nav aria-label="Policy links">
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/security">Security</Link>
+          <Link href="/accessibility">Accessibility</Link>
+          <Link href="/subprocessors">Subprocessors</Link>
+        </nav>
+      </footer>
     </div>
   );
 }

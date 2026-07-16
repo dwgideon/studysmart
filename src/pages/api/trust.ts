@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
@@ -17,7 +18,7 @@ async function audit(actorUserId: string, action: string, resourceType: string, 
   });
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authUser = await requireApiUser(req, res);
   if (!authUser) {return;}
   const user = await prisma.user.findUnique({ where: { id: authUser.id } });
@@ -147,7 +148,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!organizationName) {return res.status(400).json({ error: "School or district name is required." });}
     const domain = user.email.split("@")[1]?.toLowerCase() ?? "";
     const emailConfirmed = Boolean(authUser.email_confirmed_at);
-    const domainVerified = emailConfirmed && domain && !PUBLIC_EMAIL_DOMAINS.has(domain);
+    const verifiedOrganization = emailConfirmed && domain && !PUBLIC_EMAIL_DOMAINS.has(domain)
+      ? await prisma.organization.findFirst({
+          where: { verifiedDomain: domain, status: "ACTIVE" },
+          select: { id: true },
+        })
+      : null;
+    const domainVerified = Boolean(verifiedOrganization);
     const status = domainVerified ? "DOMAIN_VERIFIED" : "PENDING_REVIEW";
     const verification = await prisma.$transaction(async (tx) => {
       const created = await tx.roleVerification.create({
@@ -159,8 +166,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           status,
           reviewedAt: domainVerified ? new Date() : null,
           reviewNote: domainVerified
-            ? "Confirmed email ownership on a non-public organization domain."
-            : "Manual school affiliation review required.",
+            ? "Confirmed email ownership for an independently verified organization domain."
+            : "Manual school affiliation review required; email domain alone is not verification.",
         },
       });
       await tx.user.update({
@@ -238,3 +245,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(400).json({ error: "Unknown action." });
 }
+
+export default withApiMonitoring("api.trust", handler);

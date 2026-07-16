@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
 import { prisma } from "@/lib/prisma";
 import { generateFlashcardsFromText, UnsafeGeneratedContentError } from "@/lib/aiHelpers";
 import { requireApiUser } from "@/lib/auth";
@@ -27,7 +28,7 @@ function fieldValue(value: string | string[] | undefined): string | undefined {
   return value;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -217,3 +218,5 @@ export default async function handler(
     return res.status(500).json({ error: "Generation failed" });
   }
 }
+
+export default withApiMonitoring("api.process-materials", handler);

@@ -1,6 +1,6 @@
 # StudySmart K–12 threat model
 
-Last reviewed: 2026-07-14
+Last reviewed: 2026-07-16
 
 ## Protected assets
 
@@ -25,8 +25,10 @@ Learner identity and education records, uploaded materials, tutor history, maste
 | LMS token forgery or replay | Remote JWKS verification, issuer/client/deployment checks, one-time state and nonce hashes, expiry, private-network URL rejection | 1EdTech conformance testing and key-rotation drill |
 | Cross-tenant district access | Membership-scoped queries, owner/admin policy changes, verified-domain creation, audit events | Database row-level defense in depth and external tenant-isolation test |
 | Data retained too long | Learner/district retention ceiling, daily enforcement record, safety-detail purge, cascade deletion | Monitor cron success and test restore/deletion behavior in backups |
-| Telemetry leaks learner content | Analytics opt-in, keyed hashes only, no raw AI content in trace table | Rotate hash key and verify downstream provider/log configuration |
-| XSS/CSRF/session theft | React escaping, SameSite auth cookies, CSP, frame denial, security headers, server-side user verification | Replace inline CSP allowances with nonces and complete penetration test |
+| Telemetry leaks learner content | Analytics opt-in, keyed hashes only, no raw AI content in trace table, structured operational-event redaction | Rotate hash key and verify downstream provider/log configuration |
+| XSS/CSRF/session theft | React escaping, SameSite auth cookies, explicit trusted-origin mutation checks, CSP, frame denial, security headers, server-side user verification | Replace inline CSP allowances with nonces and complete penetration test |
+| Checkout account spoofing | Server-authenticated billing identity, database-owned Stripe customer ID, server-controlled pricing/metadata | Stripe sandbox abuse testing and webhook replay/load testing |
+| Silent operational failure | Correlation IDs, dependency health, authenticated operational status, persistent cron runs, redacted error events, webhook-ready alerts | Configure real alert destinations, external uptime checks, and incident tabletop |
 
 ## Abuse invariants
 

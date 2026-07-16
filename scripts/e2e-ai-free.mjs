@@ -57,15 +57,15 @@ function isRetryableAuthError(error) {
 
 async function authRequest(operation) {
   let lastError;
-  for (let attempt = 1; attempt <= 4; attempt += 1) {
+  for (let attempt = 1; attempt <= 8; attempt += 1) {
     try {
       const result = await operation();
       if (result?.error) {throw result.error;}
       return result;
     } catch (error) {
       lastError = error;
-      if (!isRetryableAuthError(error) || attempt === 4) {throw error;}
-      await sleep(250 * attempt);
+      if (!isRetryableAuthError(error) || attempt === 8) {throw error;}
+      await sleep(Math.min(500 * attempt, 3_000));
     }
   }
   throw lastError;
@@ -110,6 +110,27 @@ async function deleteTestActors(userIds) {
   ]));
 }
 
+async function cleanupInterruptedFixtures() {
+  const staleAuthUsers = [];
+  for (let page = 1; ; page += 1) {
+    const result = await authRequest(() => admin.auth.admin.listUsers({ page, perPage: 1000 }));
+    staleAuthUsers.push(...result.data.users.filter((user) =>
+      user.email?.startsWith("studysmart-e2e-")
+    ));
+    if (result.data.users.length < 1000) {break;}
+  }
+  if (!staleAuthUsers.length) {return;}
+  const staleIds = staleAuthUsers.map((user) => user.id);
+  await database(() => prisma.organization.deleteMany({
+    where: { name: { startsWith: "E2E District " } },
+  }));
+  await deleteTestActors(staleIds);
+  for (const user of staleAuthUsers) {
+    await authRequest(() => admin.auth.admin.deleteUser(user.id));
+  }
+  process.stdout.write(`Cleaned ${staleAuthUsers.length} interrupted E2E fixture(s).\n`);
+}
+
 async function createActor(kind, domain = "example.com") {
   const email = `studysmart-e2e-${kind}-${suffix}@${domain}`;
   let actorUser;
@@ -142,7 +163,7 @@ async function createActor(kind, domain = "example.com") {
 async function request(actor, path, options = {}) {
   const expected = options.expected || [200];
   let last;
-  for (let attempt = 1; attempt <= 4; attempt += 1) {
+  for (let attempt = 1; attempt <= 8; attempt += 1) {
     const headers = { ...(options.headers || {}) };
     if (actor?.cookie) {headers.cookie = actor.cookie;}
     let body;
@@ -168,11 +189,11 @@ async function request(actor, path, options = {}) {
       const payload = contentType.includes("json") && text ? JSON.parse(text) : text;
       last = { response, payload, text };
       if (expected.includes(response.status)) {return last;}
-      if (![401, 500, 502, 503, 504].includes(response.status) || attempt === 4) {
+      if (![401, 500, 502, 503, 504].includes(response.status) || attempt === 8) {
         throw new Error(`${options.method || "GET"} ${path} returned ${response.status}: ${text.slice(0, 300)}`);
       }
     } catch (error) {
-      if (attempt === 4) {throw error;}
+      if (attempt === 8) {throw error;}
       last = error;
     }
     await sleep(250 * attempt);
@@ -180,7 +201,7 @@ async function request(actor, path, options = {}) {
   throw last instanceof Error ? last : new Error(`Request failed: ${path}`);
 }
 
-async function saveProfile(actor, gradeLevel, ageGroup, courseId) {
+async function saveProfile(actor, gradeLevel, ageGroup, courseId, expectedAgeGroup) {
   const result = await request(actor, "/api/profile/learning-context", {
     method: "PUT",
     expected: [200],
@@ -195,7 +216,21 @@ async function saveProfile(actor, gradeLevel, ageGroup, courseId) {
       courseLearningGoal: "Build durable, source-grounded mastery.",
     },
   });
+  if (expectedAgeGroup) {assert.equal(result.payload.ageGroup, expectedAgeGroup);}
   return result.payload.course.id;
+}
+
+async function establishAdultRole(actor, role) {
+  const age = await request(actor, "/api/trust", {
+    method: "POST",
+    json: { action: "update-age-group", ageGroup: "ADULT" },
+  });
+  assert.equal(age.payload.ageGroup, "ADULT");
+  const changed = await request(actor, "/api/community", {
+    method: "POST",
+    json: { action: "set-role", role },
+  });
+  assert.equal(changed.payload.role, role);
 }
 
 async function completeDiagnostic(actor, grade) {
@@ -263,13 +298,25 @@ async function completeGame(actor, mode, project) {
 }
 
 async function main() {
+  await cleanupInterruptedFixtures();
+
   const mode = await request(null, "/api/system/mode");
   assert.equal(mode.payload.aiFreeTestMode, true);
   assert.equal(mode.payload.paidAiCallsEnabled, false);
   pass("AI-free mode blocks paid AI calls");
 
+  const health = await request(null, "/api/health");
+  assert.equal(health.payload.status, "ok");
+  await request(null, "/api/ops/status", { expected: [401] });
+  pass("public dependency health and protected operations status");
+
   const unauthorized = await request(null, "/api/profile/learning-context", { expected: [401] });
   assert.equal(unauthorized.payload.error, "Unauthorized");
+  await request(null, "/api/stripe/create-checkout-session", {
+    method: "POST",
+    expected: [401],
+    json: { priceKey: "starter", user: { id: randomUUID(), email: "spoofed@example.test" } },
+  });
   pass("protected APIs reject anonymous access");
 
   const student = await createActor("student");
@@ -279,7 +326,7 @@ async function main() {
 
   let courseId;
   for (const grade of ["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]) {
-    courseId = await saveProfile(student, grade, "TEEN", courseId);
+    courseId = await saveProfile(student, grade, "TEEN", courseId, "UNDER_13");
     await completeDiagnostic(student, grade);
     const hub = await request(student, "/api/games/hub");
     assert.equal(hub.payload.experience.gradeLevel, grade);
@@ -288,6 +335,14 @@ async function main() {
     assert.equal(hub.payload.experience.companion.elementary, elementary);
     pass(`grade ${grade} profile, six skills, diagnostic, and experience`);
   }
+
+  await request(student, "/api/profile/learning-context", {
+    method: "PUT",
+    expected: [403],
+    headers: { origin: "https://attacker.example", "sec-fetch-site": "cross-site" },
+    json: { gradeLevel: "12", ageGroup: "ADULT", courseName: "Blocked", subject: "Blocked" },
+  });
+  pass("age-protection downgrade and cross-site mutation bypasses are blocked");
 
   courseId = await saveProfile(student, "K", "TEEN", courseId);
   const companion = await request(student, "/api/games/companion", {
@@ -421,9 +476,8 @@ async function main() {
   const qtiExport = await request(student, `/api/integrations/qti?quizId=${savedQuiz.payload.quizId}`);
   assert.ok(Buffer.from(qtiExport.text, "binary").length > 100);
 
+  await establishAdultRole(guardian, "GUARDIAN");
   await saveProfile(guardian, "12", "ADULT");
-  const guardianRole = await request(guardian, "/api/community", { method: "POST", json: { action: "set-role", role: "GUARDIAN" } });
-  assert.equal(guardianRole.payload.role, "GUARDIAN");
   await request(guardian, "/api/safety/preferences", { method: "POST", json: { action: "update", emailEnabled: false, smsEnabled: false, hasPhone: false } });
   const familyInvite = await request(guardian, "/api/community", { method: "POST", expected: [201], json: { action: "create-family-invite" } });
   await request(student, "/api/community", { method: "POST", json: { action: "join-family", code: familyInvite.payload.invite.code, relationship: "Parent" } });
@@ -432,10 +486,24 @@ async function main() {
   await request(guardian, "/api/trust", { method: "POST", json: { action: "grant-parental-consent", studentId: student.id } });
   pass("guardian role, family invite, learner connection, progress view, and parental consent");
 
+  await establishAdultRole(teacher, "TEACHER");
   await saveProfile(teacher, "12", "ADULT");
-  await request(teacher, "/api/community", { method: "POST", json: { action: "set-role", role: "TEACHER" } });
   const verification = await request(teacher, "/api/trust", { method: "POST", json: { action: "request-role-verification", organizationName: "E2E School" } });
-  assert.equal(verification.payload.verification.status, "DOMAIN_VERIFIED");
+  assert.equal(verification.payload.verification.status, "PENDING_REVIEW");
+  await database(() => prisma.$transaction([
+    prisma.roleVerification.update({
+      where: { id: verification.payload.verification.id },
+      data: {
+        status: "DOMAIN_VERIFIED",
+        reviewedAt: new Date(),
+        reviewNote: "School affiliation and domain ownership approved by the E2E administrator fixture.",
+      },
+    }),
+    prisma.user.update({
+      where: { id: teacher.id },
+      data: { roleVerificationStatus: "DOMAIN_VERIFIED", verifiedAt: new Date() },
+    }),
+  ]));
   const district = await request(teacher, "/api/district", { method: "POST", expected: [201], json: { action: "create-organization", name: `E2E District ${suffix}` } });
   createdOrganizationIds.push(district.payload.organization.id);
   await request(teacher, "/api/district", { method: "POST", json: {
@@ -495,29 +563,32 @@ async function main() {
   process.stdout.write(`\n${checks.length} end-to-end capability groups passed.\n`);
 }
 
+let executionError;
 try {
   await main();
-} finally {
-  let cleanupError;
-  for (const organizationId of createdOrganizationIds) {
-    try {
-      await database(() => prisma.organization.deleteMany({ where: { id: organizationId } }));
-    } catch (error) {
-      cleanupError ??= error;
-    }
-  }
+} catch (error) {
+  executionError = error;
+}
+let cleanupError;
+for (const organizationId of createdOrganizationIds) {
   try {
-    await deleteTestActors(createdAuthIds);
+    await database(() => prisma.organization.deleteMany({ where: { id: organizationId } }));
   } catch (error) {
     cleanupError ??= error;
   }
-  for (const id of createdAuthIds) {
-    try {
-      await authRequest(() => admin.auth.admin.deleteUser(id));
-    } catch (error) {
-      if (error?.status !== 404) {cleanupError ??= error;}
-    }
-  }
-  await prisma.$disconnect();
-  if (cleanupError) {throw cleanupError;}
 }
+try {
+  await deleteTestActors(createdAuthIds);
+} catch (error) {
+  cleanupError ??= error;
+}
+for (const id of createdAuthIds) {
+  try {
+    await authRequest(() => admin.auth.admin.deleteUser(id));
+  } catch (error) {
+    if (error?.status !== 404) {cleanupError ??= error;}
+  }
+}
+await prisma.$disconnect();
+if (executionError) {throw executionError;}
+if (cleanupError) {throw cleanupError;}

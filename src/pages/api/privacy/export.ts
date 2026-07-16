@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
 import { prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {return res.status(405).end();}
   const authUser = await requireApiUser(req, res);
   if (!authUser) {return;}
@@ -46,3 +47,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     aiInteractionTraces: aiTraces, safetyEvents, auditEvents,
   });
 }
+
+export default withApiMonitoring("api.privacy.export", handler);

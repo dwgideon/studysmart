@@ -49,6 +49,13 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0" }],
       },
       {
+        source: "/api/ops/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
+      {
         source: "/api/trust",
         headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0" }],
       },

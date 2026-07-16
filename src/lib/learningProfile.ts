@@ -29,6 +29,48 @@ export type LearningContextPayload = {
   courseLearningGoal: string;
 };
 
+export type AgeGroup = "UNDER_13" | "TEEN" | "ADULT";
+
+const AGE_PROTECTION_ORDER: Record<AgeGroup, number> = {
+  UNDER_13: 0,
+  TEEN: 1,
+  ADULT: 2,
+};
+
+/**
+ * Learners cannot use an age selector to escape a more protective experience.
+ * Grade level is treated as a safety signal, and an existing child setting can
+ * only be relaxed through the reviewed correction workflow.
+ */
+export function protectedAgeGroupForGrade(input: {
+  gradeLevel: string;
+  requestedAgeGroup: AgeGroup;
+  existingAgeGroup?: string | null;
+  accountRole?: string;
+}): AgeGroup {
+  if (input.accountRole && input.accountRole !== "STUDENT") {
+    return input.requestedAgeGroup;
+  }
+
+  const gradeNumber = input.gradeLevel === "K" ? 0 : Number(input.gradeLevel);
+  let protectedGroup = input.requestedAgeGroup;
+  if (Number.isFinite(gradeNumber) && gradeNumber <= 5) {
+    protectedGroup = "UNDER_13";
+  } else if (protectedGroup === "ADULT") {
+    protectedGroup = "TEEN";
+  }
+
+  const existing = input.existingAgeGroup as AgeGroup | undefined;
+  if (
+    existing &&
+    AGE_PROTECTION_ORDER[existing] !== undefined &&
+    AGE_PROTECTION_ORDER[protectedGroup] > AGE_PROTECTION_ORDER[existing]
+  ) {
+    return existing;
+  }
+  return protectedGroup;
+}
+
 export function cleanText(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }

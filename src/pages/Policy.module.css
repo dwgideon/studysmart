@@ -1,0 +1,15 @@
+.page { margin: 0 auto; max-width: 920px; padding: clamp(2rem, 6vw, 5rem) 1rem; }
+.hero { border-bottom: 1px solid var(--border-subtle); margin-bottom: 2rem; padding-bottom: 1.5rem; }
+.eyebrow { color: var(--cyan-300); font-size: .76rem; font-weight: 850; letter-spacing: .18em; text-transform: uppercase; }
+.hero h1 { font-size: clamp(2.5rem, 8vw, 5rem); letter-spacing: -.06em; margin: .4rem 0 1rem; }
+.hero p, .section p, .section li { color: var(--text-secondary); line-height: 1.75; }
+.meta { color: var(--text-muted); font-size: .9rem; }
+.notice { background: rgba(14, 165, 233, .09); border: 1px solid rgba(56, 189, 248, .35); border-radius: 1rem; color: var(--text-secondary); margin: 1.5rem 0; padding: 1rem 1.15rem; }
+.section { background: linear-gradient(145deg, rgba(13, 39, 79, .5), rgba(5, 19, 43, .65)); border: 1px solid var(--border-subtle); border-radius: 1.2rem; margin: 1rem 0; padding: clamp(1.1rem, 4vw, 1.8rem); }
+.section h2 { font-size: clamp(1.35rem, 3vw, 1.8rem); margin: 0 0 .65rem; }
+.section h3 { color: var(--text-primary); margin: 1.2rem 0 .35rem; }
+.section ul { padding-left: 1.2rem; }
+.section a { color: var(--cyan-300); }
+.table { border-collapse: collapse; display: block; overflow-x: auto; width: 100%; }
+.table th, .table td { border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary); padding: .8rem; text-align: left; vertical-align: top; }
+.table th { color: var(--text-primary); }

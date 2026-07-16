@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
 import { Prisma } from "@prisma/client";
 import { openai } from "@/lib/openai";
 import { prisma } from "@/lib/prisma";
@@ -22,7 +23,7 @@ import { isAiFreeTestMode } from "@/lib/aiFreeTestMode";
 
 const QUESTION_COUNT = 6;
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -61,6 +62,8 @@ export default async function handler(
     return res.status(500).json({ error: "The diagnostic could not continue." });
   }
 }
+
+export default withApiMonitoring("api.diagnostic", handler);
 
 async function startDiagnostic(userId: string, res: NextApiResponse) {
   const [profile, course] = await Promise.all([

@@ -4,6 +4,8 @@ import { requireApiUser } from "@/lib/auth";
 import {
   cleanText,
   GRADE_LEVEL_VALUES,
+  protectedAgeGroupForGrade,
+  type AgeGroup,
   type LearningContextPayload,
 } from "@/lib/learningProfile";
 
@@ -24,7 +26,7 @@ export default async function handler(
     const [account, profile, courses] = await Promise.all([
       prisma.user.findUnique({
         where: { id: user.id },
-        select: { ageGroup: true },
+        select: { ageGroup: true, accountRole: true },
       }),
       prisma.learnerProfile.findUnique({ where: { userId: user.id } }),
       prisma.course.findMany({
@@ -66,6 +68,17 @@ export default async function handler(
     return res.status(400).json({ error: "Choose a valid age group." });
   }
 
+  const account = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { ageGroup: true, accountRole: true },
+  });
+  const protectedAgeGroup = protectedAgeGroupForGrade({
+    gradeLevel,
+    requestedAgeGroup: ageGroup as AgeGroup,
+    existingAgeGroup: account.ageGroup,
+    accountRole: account.accountRole,
+  });
+
   if (!courseName || !subject) {
     return res
       .status(400)
@@ -93,7 +106,7 @@ export default async function handler(
   const [, course] = await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: user.id },
-      data: { ageGroup },
+      data: { ageGroup: protectedAgeGroup },
     });
     const profile = await tx.learnerProfile.upsert({
       where: { userId: user.id },
@@ -142,7 +155,8 @@ export default async function handler(
 
   return res.status(200).json({
     ok: true,
-    requiresGuardianConsent: ageGroup === "UNDER_13",
+    ageGroup: protectedAgeGroup,
+    requiresGuardianConsent: protectedAgeGroup === "UNDER_13",
     course: { ...course, examDate: serializeDate(course.examDate) },
   });
 }

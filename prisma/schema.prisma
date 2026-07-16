@@ -1129,3 +1129,16 @@ model DataRetentionRun {
 
   @@index([status, startedAt])
 }
+
+model OperationalRun {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  job         String
+  status      String    @default("RUNNING")
+  requestId   String?
+  summary     Json?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([job, status, startedAt])
+  @@index([startedAt])
+}

@@ -1,10 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
 import { prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
 import { updateUserStreak } from "@/lib/streakService";
 import { awardXp } from "@/lib/xp";
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -62,3 +63,5 @@ export default async function handler(
     return res.status(500).json({ error: "Failed to complete session" });
   }
 }
+
+export default withApiMonitoring("api.study.complete", handler);

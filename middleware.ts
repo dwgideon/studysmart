@@ -3,32 +3,17 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export async function middleware(req: NextRequest) {
-  // Get the Supabase session from cookies
-  const accessToken = req.cookies.get("sb-access-token");
-
-  const { pathname } = req.nextUrl;
-
-  // Allow requests to public paths
-  if (
-    pathname === "/" || // login/signup page
-    pathname.startsWith("/_next") || // next.js internals
-    pathname.startsWith("/api") || // API routes
-    pathname.startsWith("/static") ||
-    pathname.includes(".") // files like favicon.ico
-  ) {
-    return NextResponse.next();
-  }
-
-  // If user is not logged in and trying to access protected page
-  if (!accessToken) {
-    const loginUrl = new URL("/", req.url);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  return NextResponse.next();
+  const incoming = req.headers.get("x-request-id");
+  const requestId = incoming && /^[A-Za-z0-9_-]{8,80}$/.test(incoming)
+    ? incoming
+    : crypto.randomUUID();
+  const headers = new Headers(req.headers);
+  headers.set("x-request-id", requestId);
+  const response = NextResponse.next({ request: { headers } });
+  response.headers.set("x-request-id", requestId);
+  return response;
 }
 
-// Limit middleware to specific routes
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

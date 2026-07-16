@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
@@ -71,7 +72,7 @@ const studentSelect = {
   },
 };
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -413,3 +414,5 @@ export default async function handler(
 
   return res.status(400).json({ error: "Unknown action." });
 }
+
+export default withApiMonitoring("api.community", handler);

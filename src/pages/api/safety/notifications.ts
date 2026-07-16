@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
 import { requireApiUser } from "@/lib/auth";
 import { decryptSafetyAttempt } from "@/lib/childSafety";
 import { prisma } from "@/lib/prisma";
@@ -37,7 +38,7 @@ async function authorizedLearners(
   return new Set<string>();
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authUser = await requireApiUser(req, res);
   if (!authUser) {return;}
   const recipient = await prisma.user.findUnique({
@@ -202,3 +203,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     unreadCount: alerts.filter((alert) => !alert.readAt).length,
   });
 }
+
+export default withApiMonitoring("api.safety.notifications", handler);

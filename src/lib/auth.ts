@@ -3,6 +3,7 @@ import { createPagesServerClient } from "@supabase/auth-helpers-nextjs";
 import type { User } from "@supabase/supabase-js";
 import { ensureUser } from "@/lib/ensureUser";
 import { prisma } from "@/lib/prisma";
+import { isTrustedMutationRequest } from "@/lib/requestSecurity";
 
 const LOCK_EXEMPT_API_PREFIXES = [
   "/api/community",
@@ -51,6 +52,14 @@ export async function requireApiUser(
   const user = await getApiUser(req, res);
   if (!user) {
     res.status(401).json({ error: "Unauthorized" });
+    return null;
+  }
+
+  if (!isTrustedMutationRequest(req)) {
+    res.status(403).json({
+      code: "CROSS_SITE_MUTATION_BLOCKED",
+      error: "This request did not come from a trusted StudySmart origin.",
+    });
     return null;
   }
 

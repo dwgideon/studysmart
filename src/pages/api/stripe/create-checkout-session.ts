@@ -1,84 +1,72 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { stripe } from '@/lib/stripe';
+import type { NextApiRequest, NextApiResponse } from "next";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
+import { requireApiUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { stripe } from "@/lib/stripe";
 
 const PRICE_MAP = {
-  starter: process.env.STRIPE_PRICE_ID_STARTER!,
-  pro: process.env.STRIPE_PRICE_ID_PRO!,
-  unlimited: process.env.STRIPE_PRICE_ID_UNLIMITED!,
+  starter: process.env.STRIPE_PRICE_ID_STARTER ?? process.env.PRICE_STARTER,
+  pro: process.env.STRIPE_PRICE_ID_PRO ?? process.env.PRICE_PRO,
+  unlimited: process.env.STRIPE_PRICE_ID_UNLIMITED ?? process.env.PRICE_UNLIMITED,
 } as const;
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ error: "Method not allowed" });
   }
+  const authUser = await requireApiUser(req, res);
+  if (!authUser) {return;}
 
   try {
-    if (
-      !process.env.STRIPE_SECRET_KEY ||
-      process.env.STRIPE_SECRET_KEY.includes("PASTE_NEW")
-    ) {
-      return res.status(503).json({
-        error: "Payments are not configured. Add Stripe keys to .env.",
-      });
+    if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY.includes("PASTE_NEW")) {
+      return res.status(503).json({ error: "Payments are not configured." });
+    }
+    const priceKey = req.body?.priceKey as keyof typeof PRICE_MAP | undefined;
+    const price = priceKey ? PRICE_MAP[priceKey] : undefined;
+    if (!priceKey || typeof price !== "string" || !price.startsWith("price_")) {
+      return res.status(400).json({ error: "Invalid plan selected" });
+    }
+    if (!authUser.email) {
+      return res.status(409).json({ error: "A verified account email is required for billing." });
     }
 
-    const { priceKey, user } = req.body as {
-      priceKey?: keyof typeof PRICE_MAP;
-      user?: { id?: string; email?: string };
-    };
-
-    if (!user?.id || !user?.email) {
-      return res.status(401).json({ error: 'Login required' });
+    const account = await prisma.user.findUniqueOrThrow({ where: { id: authUser.id } });
+    let customerId = account.stripeCustomerId;
+    if (!customerId) {
+      const existing = await stripe.customers.list({ email: authUser.email, limit: 1 });
+      customerId = existing.data[0]?.id;
     }
-
-    if (!priceKey || !(priceKey in PRICE_MAP)) {
-  return res.status(400).json({ error: "Invalid plan selected" });
-}
-
-const price = PRICE_MAP[priceKey];
-
-
-if (typeof price !== 'string') {
-  return res.status(400).json({ error: 'Invalid plan selected' });
-}
-
-    // Find or create Stripe customer
-    const existing = await stripe.customers.list({
-      email: user.email,
-      limit: 1,
-    });
-
-    let customerId = existing.data[0]?.id;
-
     if (!customerId) {
       const customer = await stripe.customers.create({
-        email: user.email,
-        metadata: { app_user_id: user.id },
+        email: authUser.email,
+        metadata: { app_user_id: authUser.id },
       });
       customerId = customer.id;
     }
+    if (account.stripeCustomerId !== customerId) {
+      await prisma.user.update({
+        where: { id: authUser.id },
+        data: { stripeCustomerId: customerId },
+      });
+    }
 
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL;
+    if (!siteUrl) {return res.status(503).json({ error: "The payment return URL is not configured." });}
     const session = await stripe.checkout.sessions.create({
-  mode: 'subscription',
-  customer: customerId,
-  payment_method_types: ['card'],
-  line_items: [{ price, quantity: 1 }],
-  allow_promotion_codes: true,
-  success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/?status=success`,
-  cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/pricing?status=cancel`,
-  metadata: {
-    app_user_id: user.id,
-    plan_key: priceKey,
-  },
-});
-
-
+      mode: "subscription",
+      customer: customerId,
+      payment_method_types: ["card"],
+      line_items: [{ price, quantity: 1 }],
+      allow_promotion_codes: true,
+      success_url: `${siteUrl.replace(/\/$/, "")}/?status=success`,
+      cancel_url: `${siteUrl.replace(/\/$/, "")}/pricing?status=cancel`,
+      metadata: { app_user_id: authUser.id, plan_key: priceKey },
+    });
     return res.status(200).json({ url: session.url });
-  } catch (e) {
-    console.error('create-checkout-session error:', e);
-    return res.status(500).json({ error: 'Stripe error' });
+  } catch {
+    return res.status(502).json({ error: "The payment provider could not create a checkout session." });
   }
 }
+
+export default withApiMonitoring("api.stripe.checkout", handler);

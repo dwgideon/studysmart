@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
 import { prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -47,3 +48,5 @@ export default async function handler(
     return res.status(500).json({ error: "Failed to start study session" });
   }
 }
+
+export default withApiMonitoring("api.study.start", handler);

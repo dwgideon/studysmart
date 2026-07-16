@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
 import type { Prisma } from "@prisma/client";
 import { openai } from "@/lib/openai";
 import { prisma } from "@/lib/prisma";
@@ -31,7 +32,7 @@ type Citation = {
   excerpt: string;
 };
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -271,3 +272,5 @@ export default async function handler(
     return res.status(500).json({ reply: isAiFreeTestMode ? "The local test tutor could not respond." : "AI tutor failed to respond." });
   }
 }
+
+export default withApiMonitoring("api.tutor", handler);

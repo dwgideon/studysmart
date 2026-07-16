@@ -1,0 +1,4 @@
+Contact: https://github.com/dwgideon/studysmart/security/advisories/new
+Expires: 2027-07-16T23:59:59Z
+Preferred-Languages: en
+Policy: https://github.com/dwgideon/studysmart/blob/main/SECURITY.md

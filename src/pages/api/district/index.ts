@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
@@ -30,7 +31,7 @@ async function audit(
   });
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authUser = await requireApiUser(req, res);
   if (!authUser) {return;}
   const user = await prisma.user.findUnique({ where: { id: authUser.id } });
@@ -197,3 +198,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(400).json({ error: "Unknown action." });
 }
+
+export default withApiMonitoring("api.district", handler);

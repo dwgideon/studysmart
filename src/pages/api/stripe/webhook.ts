@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
 import type { Readable } from "stream";
 import Stripe from "stripe";
 import { stripe } from "../../../lib/stripe";
@@ -29,7 +30,7 @@ function subscriptionPeriodEnd(subscription: Stripe.Subscription) {
   return typeof value === "number" ? value : null;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -144,3 +145,5 @@ export default async function handler(
     res.status(500).end();
   }
 }
+
+export default withApiMonitoring("api.stripe.webhook", handler);

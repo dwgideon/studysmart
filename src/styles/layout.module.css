@@ -21,4 +21,8 @@
   position: relative;
 }
 .card::before { background: linear-gradient(90deg, transparent, rgba(125,211,252,.16), transparent); content: ""; height: 1px; left: 12%; position: absolute; right: 12%; top: 0; }
+.footer { align-items: center; border-top: 1px solid var(--border-subtle); color: var(--text-muted); display: flex; font-size: .86rem; gap: 1.25rem; justify-content: space-between; margin: 2rem auto 0; max-width: var(--max-width); padding: 1.5rem; position: relative; z-index: 1; }
+.footer nav { display: flex; flex-wrap: wrap; gap: 1rem; }
+.footer a { color: var(--text-secondary); }
 @media (max-width: 900px) { .grid2, .grid3 { grid-template-columns: 1fr; } .container { padding: 1.5rem 1rem 3rem; } }
+@media (max-width: 700px) { .footer { align-items: flex-start; flex-direction: column; } }
