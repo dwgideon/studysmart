@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import RequireAuth from "../components/RequireAuth";
 import { useRouter } from "next/router";
 import { useXP } from "../hooks/useXP";
@@ -35,6 +35,7 @@ function QuizRunner() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
   const [answers, setAnswers] = useState<Record<number, string>>({});
+  const completionSaved = useRef(false);
 
   useEffect(() => {
     if (!router.isReady) {return;}
@@ -48,10 +49,26 @@ function QuizRunner() {
           setError(data.error);
           return;
         }
+        completionSaved.current = false;
         setQuestions(data.questions ?? []);
       })
       .catch(() => setError("Failed to load quiz"));
   }, [router.isReady, sessionId]);
+
+  useEffect(() => {
+    if (!done || completionSaved.current) {return;}
+    completionSaved.current = true;
+    void fetch("/api/saveQuiz", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Flashcard quiz",
+        source: "flashcards",
+        questions,
+        answers,
+      }),
+    }).then(() => addXP(0));
+  }, [addXP, answers, done, questions]);
 
   if (error) {
     return (
@@ -67,25 +84,7 @@ function QuizRunner() {
   }
 
   if (done) {
-    return (
-      <QuizComplete
-        score={score}
-        total={questions.length}
-        onSave={async () => {
-          await fetch("/api/saveQuiz", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              title: "Flashcard quiz",
-              source: "flashcards",
-              questions,
-              answers,
-            }),
-          });
-          addXP(score * 8);
-        }}
-      />
-    );
+    return <QuizComplete score={score} total={questions.length} />;
   }
 
   const q = questions[index];
@@ -172,16 +171,10 @@ function Center({ children }: { children: React.ReactNode }) {
 function QuizComplete({
   score,
   total,
-  onSave,
 }: {
   score: number;
   total: number;
-  onSave: () => void;
 }) {
-  useEffect(() => {
-    onSave();
-  }, [onSave]);
-
   return (
     <Center>
       <div className="practice-panel"

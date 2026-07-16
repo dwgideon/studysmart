@@ -89,8 +89,6 @@ function InteractiveQuizContent() {
     ).length;
     setScore(finalScore);
     setDone(true);
-    const xp = finalScore * 10;
-    addXP(xp);
     await fetch("/api/saveQuiz", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -101,6 +99,7 @@ function InteractiveQuizContent() {
         answers: allAnswers,
       }),
     });
+    await addXP(0);
   }
 
   if (!questions.length) {
@@ -108,7 +107,7 @@ function InteractiveQuizContent() {
       <Shell>
         <h1>Interactive quiz</h1>
         <p style={{ color: "var(--text-secondary)", marginBottom: 16 }}>
-          Paste notes or a topic. AI builds a multiple-choice quiz for you.
+          Paste notes or a topic. StudySmart builds a multiple-choice quiz for you.
         </p>
         <label style={{ display: "grid", gap: 6 }}>
           Study material or topic

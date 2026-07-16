@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useUser } from "@supabase/auth-helpers-react";
 import { gradeBandFor, type GradeBand } from "@/lib/learningProfile";
+import { supabase } from "@/lib/supabaseClient";
 
 type Experience = {
   gradeLevel: string | null;
@@ -20,13 +21,29 @@ export function K12ExperienceProvider({ children }: { children: React.ReactNode 
   const [gradeLevel, setGradeLevel] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {setGradeLevel(null); return;}
-    Promise.all([
-      fetch("/api/profile/learning-context").then((response) => response.json()),
-      fetch("/api/trust").then((response) => response.json()),
-    ])
-      .then(([profileData, trustData]) => {
+    let active = true;
+    async function loadExperience() {
+      const sessionUser = user ?? (await supabase.auth.getSession()).data.session?.user;
+      if (!sessionUser) {
+        if (active) {setGradeLevel(null);}
+        return;
+      }
+      const profileRequest = fetch("/api/profile/learning-context", { cache: "no-store" });
+      const trustRequest = fetch("/api/trust", { cache: "no-store" });
+      const profileResponse = await profileRequest;
+      if (!profileResponse.ok) {
+        throw new Error("The K–12 experience could not be loaded.");
+      }
+      const profileData = await profileResponse.json();
+      if (active) {
         setGradeLevel(profileData.profile?.gradeLevel ?? null);
+      }
+      const trustResponse = await trustRequest;
+      if (!trustResponse.ok) {
+        throw new Error("Accessibility preferences could not be loaded.");
+      }
+      const trustData = await trustResponse.json();
+      if (active) {
         const settings = trustData.settings;
         if (settings) {
           document.body.dataset.textScale = settings.textScale ?? "DEFAULT";
@@ -34,8 +51,12 @@ export function K12ExperienceProvider({ children }: { children: React.ReactNode 
           document.body.dataset.highContrast = String(Boolean(settings.highContrast));
           document.body.dataset.readingFont = String(Boolean(settings.readingFont));
         }
-      })
-      .catch(() => setGradeLevel(null));
+      }
+    }
+    void loadExperience().catch(() => {
+      if (active) {setGradeLevel(null);}
+    });
+    return () => {active = false;};
   }, [user]);
 
   const value = useMemo<Experience>(() => {

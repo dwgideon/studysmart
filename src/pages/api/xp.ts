@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { requireApiUser, getApiUser } from "@/lib/auth";
-import { awardXp, getUserXp } from "@/lib/xp";
+import { getApiUser } from "@/lib/auth";
+import { getUserXp } from "@/lib/xp";
 
 export default async function handler(
   req: NextApiRequest,
@@ -15,14 +15,6 @@ export default async function handler(
     return res.json({ xp, level: Math.floor(xp / 100) + 1 });
   }
 
-  if (req.method === "POST") {
-    const user = await requireApiUser(req, res);
-    if (!user) {return;}
-
-    const { amount } = req.body as { amount?: number };
-    const xp = await awardXp(user.id, amount ?? 0);
-    return res.status(200).json({ ok: true, xp, level: Math.floor(xp / 100) + 1 });
-  }
-
-  res.status(405).end();
+  res.setHeader("Allow", "GET");
+  return res.status(405).json({ error: "XP is awarded only by verified learning activity." });
 }

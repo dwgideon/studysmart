@@ -1,0 +1,523 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { PrismaClient } from "@prisma/client";
+import { createClient } from "@supabase/supabase-js";
+
+const baseUrl = (process.env.E2E_BASE_URL || "http://localhost:3010").replace(/\/$/, "");
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const databaseUrl = process.env.DATABASE_URL;
+assert.ok(supabaseUrl && anonKey && serviceKey && databaseUrl, "Supabase and database environment variables are required");
+
+const e2eDatabaseUrl = new URL(databaseUrl);
+e2eDatabaseUrl.searchParams.set("connection_limit", "1");
+e2eDatabaseUrl.searchParams.set("pool_timeout", "30");
+const prisma = new PrismaClient({ datasources: { db: { url: e2eDatabaseUrl.toString() } } });
+const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+const suffix = `${Date.now()}-${randomUUID().slice(0, 6)}`;
+const password = `StudySmart-E2E-${suffix}-Strong`;
+const createdAuthIds = [];
+const createdOrganizationIds = [];
+const checks = [];
+
+function serializeSupabaseSession(session) {
+  return JSON.stringify([
+    session.access_token,
+    session.refresh_token,
+    session.provider_token,
+    session.provider_refresh_token,
+    session.user?.factors ?? null,
+  ]);
+}
+
+const gradeBands = {
+  K: "EARLY", 1: "EARLY", 2: "EARLY",
+  3: "ELEMENTARY", 4: "ELEMENTARY", 5: "ELEMENTARY",
+  6: "MIDDLE", 7: "MIDDLE", 8: "MIDDLE",
+  9: "HIGH", 10: "HIGH", 11: "HIGH", 12: "HIGH",
+};
+
+function pass(name) {
+  checks.push(name);
+  process.stdout.write(`✓ ${name}\n`);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableAuthError(error) {
+  return error?.status === 0
+    || error?.status === 429
+    || error?.status >= 500
+    || error?.name === "AuthRetryableFetchError"
+    || /fetch failed|ECONNRESET|network/i.test(error?.message || "");
+}
+
+async function authRequest(operation) {
+  let lastError;
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    try {
+      const result = await operation();
+      if (result?.error) {throw result.error;}
+      return result;
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableAuthError(error) || attempt === 4) {throw error;}
+      await sleep(250 * attempt);
+    }
+  }
+  throw lastError;
+}
+
+async function findAuthUser(email) {
+  for (let page = 1; ; page += 1) {
+    const result = await authRequest(() => admin.auth.admin.listUsers({ page, perPage: 1000 }));
+    const found = result.data.users.find((user) => user.email === email);
+    if (found) {return found;}
+    if (result.data.users.length < 1000) {return null;}
+  }
+}
+
+async function database(operation) {
+  let lastError;
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!["P1001", "P1002", "P1017", "P2024"].includes(error?.code) || attempt === 4) {
+        throw error;
+      }
+      await prisma.$disconnect();
+      await sleep(200 * attempt);
+    }
+  }
+  throw lastError;
+}
+
+async function deleteTestActors(userIds) {
+  if (!userIds.length) {return;}
+  await database(() => prisma.$transaction([
+    prisma.cardReview.deleteMany({ where: { userId: { in: userIds } } }),
+    prisma.flashcard.deleteMany({ where: { userId: { in: userIds } } }),
+    prisma.studySession.deleteMany({ where: { userId: { in: userIds } } }),
+    prisma.savedQuiz.deleteMany({ where: { userId: { in: userIds } } }),
+    prisma.studyStreak.deleteMany({ where: { userId: { in: userIds } } }),
+    prisma.note.deleteMany({ where: { userId: { in: userIds } } }),
+    prisma.user.deleteMany({ where: { id: { in: userIds } } }),
+  ]));
+}
+
+async function createActor(kind, domain = "example.com") {
+  const email = `studysmart-e2e-${kind}-${suffix}@${domain}`;
+  let actorUser;
+  try {
+    const created = await authRequest(() => admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: `E2E ${kind}` },
+    }));
+    actorUser = created.data.user;
+  } catch (error) {
+    actorUser = await findAuthUser(email);
+    if (!actorUser) {throw error;}
+  }
+  createdAuthIds.push(actorUser.id);
+
+  const client = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
+  const signed = await authRequest(() => client.auth.signInWithPassword({ email, password }));
+  if (!signed.data.session) {throw new Error("Test sign-in failed");}
+  const ref = new URL(supabaseUrl).hostname.split(".")[0];
+  const sessionCookie = encodeURIComponent(serializeSupabaseSession(signed.data.session));
+  return {
+    id: actorUser.id,
+    email,
+    cookie: `sb-${ref}-auth-token=${sessionCookie}`,
+  };
+}
+
+async function request(actor, path, options = {}) {
+  const expected = options.expected || [200];
+  let last;
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    const headers = { ...(options.headers || {}) };
+    if (actor?.cookie) {headers.cookie = actor.cookie;}
+    let body;
+    if (options.json !== undefined) {
+      headers["content-type"] = "application/json";
+      body = JSON.stringify(options.json);
+    } else if (options.formText !== undefined) {
+      const form = new FormData();
+      form.set("text", options.formText);
+      body = form;
+    } else {
+      body = options.body;
+    }
+    try {
+      const response = await fetch(`${baseUrl}${path}`, {
+        method: options.method || "GET",
+        headers,
+        body,
+        redirect: options.redirect || "follow",
+      });
+      const text = await response.text();
+      const contentType = response.headers.get("content-type") || "";
+      const payload = contentType.includes("json") && text ? JSON.parse(text) : text;
+      last = { response, payload, text };
+      if (expected.includes(response.status)) {return last;}
+      if (![401, 500, 502, 503, 504].includes(response.status) || attempt === 4) {
+        throw new Error(`${options.method || "GET"} ${path} returned ${response.status}: ${text.slice(0, 300)}`);
+      }
+    } catch (error) {
+      if (attempt === 4) {throw error;}
+      last = error;
+    }
+    await sleep(250 * attempt);
+  }
+  throw last instanceof Error ? last : new Error(`Request failed: ${path}`);
+}
+
+async function saveProfile(actor, gradeLevel, ageGroup, courseId) {
+  const result = await request(actor, "/api/profile/learning-context", {
+    method: "PUT",
+    expected: [200],
+    json: {
+      gradeLevel,
+      ageGroup,
+      primaryLearningGoal: "Verify every safe K–12 learning pathway.",
+      courseId,
+      courseName: "End-to-end Learning Lab",
+      subject: "Integrated K–12 Skills",
+      examDate: "",
+      courseLearningGoal: "Build durable, source-grounded mastery.",
+    },
+  });
+  return result.payload.course.id;
+}
+
+async function completeDiagnostic(actor, grade) {
+  const started = await request(actor, "/api/diagnostic", {
+    method: "POST",
+    expected: [201],
+    json: { action: "start" },
+  });
+  const assessment = await database(() => prisma.diagnosticAssessment.findUniqueOrThrow({
+    where: { id: started.payload.assessmentId },
+  }));
+  const questions = assessment.questions;
+  assert.equal(assessment.gradeBand, gradeBands[grade]);
+  assert.equal(questions.length, 6);
+  assert.equal(new Set(questions.map((item) => item.concept)).size, 6);
+  assert.ok(questions.every((item) => item.options[item.answer]));
+  const answers = new Map(questions.map((item) => [item.id, item.answer]));
+  let current = started.payload.question;
+  let completed;
+  for (let index = 0; index < 6; index += 1) {
+    assert.ok(current?.id, `grade ${grade} diagnostic question ${index + 1}`);
+    const answered = await request(actor, "/api/diagnostic", {
+      method: "POST",
+      expected: [200],
+      json: {
+        action: "answer",
+        assessmentId: started.payload.assessmentId,
+        questionId: current.id,
+        answer: answers.get(current.id),
+      },
+    });
+    assert.equal(answered.payload.feedback.correct, true);
+    completed = answered.payload;
+    current = answered.payload.question;
+  }
+  assert.equal(completed.complete, true);
+  assert.ok(completed.summary.readiness >= 70);
+}
+
+async function completeGame(actor, mode, project) {
+  const started = await request(actor, "/api/games/run", {
+    method: "POST",
+    json: { action: "start", mode, project },
+  });
+  const stored = await database(() => prisma.gameRun.findUniqueOrThrow({ where: { id: started.payload.runId } }));
+  const questions = stored.questions;
+  assert.equal(started.payload.questions.length, questions.length);
+  let result;
+  for (let index = 0; index < questions.length; index += 1) {
+    result = await request(actor, "/api/games/run", {
+      method: "POST",
+      json: {
+        action: "answer",
+        runId: stored.id,
+        questionIndex: index,
+        selectedIndex: questions[index].correctIndex,
+      },
+    });
+    assert.equal(result.payload.correct, true);
+    if (mode === "BUILD") {assert.ok(result.payload.material);}
+  }
+  assert.equal(result.payload.finished, true);
+  assert.ok(result.payload.xpEarned > 0 && result.payload.sparksEarned > 0);
+  return result.payload;
+}
+
+async function main() {
+  const mode = await request(null, "/api/system/mode");
+  assert.equal(mode.payload.aiFreeTestMode, true);
+  assert.equal(mode.payload.paidAiCallsEnabled, false);
+  pass("AI-free mode blocks paid AI calls");
+
+  const unauthorized = await request(null, "/api/profile/learning-context", { expected: [401] });
+  assert.equal(unauthorized.payload.error, "Unauthorized");
+  pass("protected APIs reject anonymous access");
+
+  const student = await createActor("student");
+  const guardian = await createActor("guardian");
+  const teacherDomain = `${suffix}.school.test`;
+  const teacher = await createActor("teacher", teacherDomain);
+
+  let courseId;
+  for (const grade of ["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]) {
+    courseId = await saveProfile(student, grade, "TEEN", courseId);
+    await completeDiagnostic(student, grade);
+    const hub = await request(student, "/api/games/hub");
+    assert.equal(hub.payload.experience.gradeLevel, grade);
+    assert.equal(hub.payload.experience.gradeBand, gradeBands[grade]);
+    const elementary = ["EARLY", "ELEMENTARY"].includes(gradeBands[grade]);
+    assert.equal(hub.payload.experience.companion.elementary, elementary);
+    pass(`grade ${grade} profile, six skills, diagnostic, and experience`);
+  }
+
+  courseId = await saveProfile(student, "K", "TEEN", courseId);
+  const companion = await request(student, "/api/games/companion", {
+    method: "POST",
+    json: { companionId: "luna_otter", readAloud: true, speechRate: 1.8 },
+  });
+  assert.equal(companion.payload.companion.speechRate, 1.1);
+  await request(student, "/api/games/companion", {
+    method: "POST",
+    expected: [400],
+    json: { companionId: "orbit_wolf", readAloud: true, speechRate: 0.9 },
+  });
+  pass("elementary talking companion selection and safe voice-rate limits");
+
+  const lesson = [
+    "Water Cycle Test Lesson",
+    "Evaporation happens when liquid water warms and changes into water vapor.",
+    "Condensation happens when water vapor cools and forms tiny liquid droplets.",
+    "Clouds form when condensed droplets gather in the atmosphere.",
+    "Precipitation falls as rain, snow, sleet, or hail.",
+    "Collection gathers water in oceans, lakes, rivers, and soil.",
+    "The Sun provides energy, and plants release vapor through transpiration.",
+  ].join(" ");
+  const material = await request(student, "/api/processMaterials", {
+    method: "POST",
+    formText: lesson,
+  });
+  assert.ok(material.payload.sessionId && material.payload.sourceMaterialId);
+  assert.ok(material.payload.chunkCount >= 1);
+  const cards = await request(student, `/api/getFlashcards?sessionId=${material.payload.sessionId}`);
+  assert.ok(cards.payload.flashcards.length >= 4);
+  pass("pasted material ingestion, source chunks, concepts, and deterministic flashcards");
+
+  const quiz = await request(student, "/api/quiz/start", {
+    method: "POST",
+    json: { sessionId: material.payload.sessionId },
+  });
+  assert.ok(quiz.payload.questions.length >= 4);
+  const answers = Object.fromEntries(quiz.payload.questions.map((question, index) => [String(index), question.correctAnswer]));
+  const savedQuiz = await request(student, "/api/saveQuiz", {
+    method: "POST",
+    json: { title: "Water Cycle Retrieval Check", source: "E2E", questions: quiz.payload.questions, answers, sourceMaterialId: material.payload.sourceMaterialId },
+  });
+  const listed = await request(student, "/api/listQuizzes");
+  assert.ok(listed.payload.some((item) => item.id === savedQuiz.payload.quizId));
+  const fetchedQuiz = await request(student, `/api/getQuizById?id=${savedQuiz.payload.quizId}`);
+  assert.equal(fetchedQuiz.payload.score, quiz.payload.questions.length);
+  const generatedQuiz = await request(student, "/api/generateQuiz", {
+    method: "POST",
+    json: { title: "Local Water Cycle Quiz", content: lesson },
+  });
+  assert.ok(generatedQuiz.payload.questions.length >= 5);
+  pass("flashcard quiz, deterministic quiz builder, scoring, saving, listing, and retrieval");
+
+  const study = await request(student, "/api/study/start", { method: "POST", json: {} });
+  assert.ok(study.payload.cards.length >= 4);
+  const correctReview = await request(student, "/api/study/review", {
+    method: "POST",
+    json: { sessionId: study.payload.sessionId, cardId: study.payload.cards[0].id, correct: true, rating: 4, responseTimeMs: 1200, hintCount: 0 },
+  });
+  assert.ok(new Date(correctReview.payload.schedule.nextReviewAt) > new Date());
+  await request(student, "/api/study/review", {
+    method: "POST",
+    json: { sessionId: study.payload.sessionId, cardId: study.payload.cards[1].id, correct: false, rating: 1, responseTimeMs: 4200, hintCount: 1 },
+  });
+  const xpBeforeStudy = await request(student, "/api/xp");
+  const completedStudy = await request(student, "/api/study/complete", {
+    method: "POST",
+    json: { sessionId: study.payload.sessionId },
+  });
+  assert.equal(completedStudy.payload.session.correct, 1);
+  assert.equal(completedStudy.payload.session.incorrect, 1);
+  const xpAfterStudy = await request(student, "/api/xp");
+  assert.equal(xpAfterStudy.payload.xp - xpBeforeStudy.payload.xp, completedStudy.payload.xpEarned);
+  await request(student, "/api/xp", { method: "POST", expected: [405], json: { amount: 1_000_000 } });
+  const [mastery, queue, smart, stats, streak, next] = await Promise.all([
+    request(student, "/api/mastery"), request(student, "/api/review-queue"),
+    request(student, "/api/study/smart"), request(student, "/api/study/stats"),
+    request(student, "/api/streak"), request(student, "/api/learning/next"),
+  ]);
+  assert.ok(mastery.payload.summary.totalConcepts >= 6);
+  assert.ok(queue.payload.dueNow >= 0 && smart.payload.dueCount >= 0);
+  assert.ok(stats.payload.totalReviews >= 2 && streak.payload.currentStreak >= 1);
+  assert.ok(next.payload.recommendation.mode);
+  pass("study session, correct/incorrect evidence, spaced review, mastery, streak, stats, and next-step engine");
+
+  const groundedTutor = await request(student, "/api/tutor", {
+    method: "POST",
+    json: { sourceMode: "materials", messages: [{ role: "user", content: "What powers evaporation in the water cycle?" }] },
+  });
+  assert.equal(groundedTutor.payload.attribution.mode, "UPLOADED_MATERIAL");
+  assert.ok(groundedTutor.payload.attribution.citations.length >= 1);
+  assert.match(groundedTutor.payload.reply, /\[S1\]/);
+  const generalTutor = await request(student, "/api/tutor", {
+    method: "POST",
+    json: { sourceMode: "general", messages: [{ role: "user", content: "Help me make a study plan." }] },
+  });
+  assert.equal(generalTutor.payload.attribution.mode, "GENERAL_KNOWLEDGE");
+  assert.match(generalTutor.payload.reply, /AI-free test mode|paid AI/i);
+  pass("source-grounded and general tutor modes with explicit attribution");
+
+  const beforeGames = await request(student, "/api/games/hub");
+  const grid = await completeGame(student, "GRID");
+  const build = await completeGame(student, "BUILD", "Dream Library");
+  const afterGames = await request(student, "/api/games/hub");
+  assert.ok(afterGames.payload.player.xp > beforeGames.payload.player.xp);
+  assert.ok(afterGames.payload.player.sparks > beforeGames.payload.player.sparks);
+  assert.equal(build.score, build.xpEarned > 0 ? cards.payload.flashcards.length : build.score);
+  assert.ok(grid.score > 0 && afterGames.payload.recentRuns.length >= 2);
+  await database(() => prisma.gameProfile.update({ where: { userId: student.id }, data: { sparks: 500 } }));
+  const bought = await request(student, "/api/games/avatar", { method: "POST", json: { action: "buy", itemId: "top_builder" } });
+  assert.equal(bought.payload.owned, true);
+  const equipped = await request(student, "/api/games/avatar", { method: "POST", json: { action: "equip", itemId: "top_builder" } });
+  assert.equal(equipped.payload.equipped, true);
+  pass("Knowledge Grid, Build Lab materials, XP, Sparks, leaderboard history, avatar purchase, and equip");
+
+  const trustSaved = await request(student, "/api/trust", {
+    method: "POST",
+    json: {
+      action: "update-settings", aiPersonalizationEnabled: true, productAnalyticsEnabled: false,
+      shareProgressWithTeachers: true, shareProgressWithGuardians: true, tutorHistoryEnabled: true,
+      dataRetentionDays: 30, textScale: "EXTRA_LARGE", reduceMotion: true, highContrast: true, readingFont: true,
+    },
+  });
+  assert.equal(trustSaved.payload.settings.highContrast, true);
+  const exported = await request(student, "/api/privacy/export");
+  assert.equal(exported.payload.user.id, student.id);
+  assert.ok(Array.isArray(exported.payload.masteries));
+  pass("privacy, accessibility, retention preferences, and complete data export");
+
+  const qtiExport = await request(student, `/api/integrations/qti?quizId=${savedQuiz.payload.quizId}`);
+  assert.ok(Buffer.from(qtiExport.text, "binary").length > 100);
+
+  await saveProfile(guardian, "12", "ADULT");
+  const guardianRole = await request(guardian, "/api/community", { method: "POST", json: { action: "set-role", role: "GUARDIAN" } });
+  assert.equal(guardianRole.payload.role, "GUARDIAN");
+  await request(guardian, "/api/safety/preferences", { method: "POST", json: { action: "update", emailEnabled: false, smsEnabled: false, hasPhone: false } });
+  const familyInvite = await request(guardian, "/api/community", { method: "POST", expected: [201], json: { action: "create-family-invite" } });
+  await request(student, "/api/community", { method: "POST", json: { action: "join-family", code: familyInvite.payload.invite.code, relationship: "Parent" } });
+  const guardianView = await request(guardian, "/api/community");
+  assert.ok(guardianView.payload.students.some((item) => item.student.id === student.id));
+  await request(guardian, "/api/trust", { method: "POST", json: { action: "grant-parental-consent", studentId: student.id } });
+  pass("guardian role, family invite, learner connection, progress view, and parental consent");
+
+  await saveProfile(teacher, "12", "ADULT");
+  await request(teacher, "/api/community", { method: "POST", json: { action: "set-role", role: "TEACHER" } });
+  const verification = await request(teacher, "/api/trust", { method: "POST", json: { action: "request-role-verification", organizationName: "E2E School" } });
+  assert.equal(verification.payload.verification.status, "DOMAIN_VERIFIED");
+  const district = await request(teacher, "/api/district", { method: "POST", expected: [201], json: { action: "create-organization", name: `E2E District ${suffix}` } });
+  createdOrganizationIds.push(district.payload.organization.id);
+  await request(teacher, "/api/district", { method: "POST", json: {
+    action: "update-policy", organizationId: district.payload.organization.id,
+    allowedGradeBands: ["K–2", "3–5", "6–8", "9–12"], aiTutorEnabled: true,
+    multimodalEnabled: true, externalKnowledgeEnabled: true, requireGuardianConsent: false,
+    dataRetentionDays: 30, safetyAlertChannels: ["IN_APP"], lockedSettings: [],
+  } });
+  const classroom = await request(teacher, "/api/community", { method: "POST", expected: [201], json: { action: "create-classroom", name: "E2E Learning Lab", subject: "Integrated Skills", gradeBand: "K–2" } });
+  await request(student, "/api/community", { method: "POST", json: { action: "join-classroom", code: classroom.payload.classroom.joinCode } });
+  const assignment = await request(teacher, "/api/community", { method: "POST", expected: [201], json: { action: "create-assignment", classroomId: classroom.payload.classroom.id, title: "Explain the water cycle", instructions: "Use the uploaded lesson." } });
+  await request(student, "/api/community", { method: "POST", json: { action: "complete-assignment", assignmentId: assignment.payload.assignment.id } });
+  const teacherView = await request(teacher, "/api/community");
+  assert.ok(teacherView.payload.classrooms[0].memberships.some((item) => item.student.id === student.id));
+  pass("verified teacher, district policy, classroom join, assignment creation/completion, and progress signals");
+
+  const ltiConfig = await request(null, "/api/integrations/lti/config");
+  assert.match(ltiConfig.payload.oidc_initiation_url, /\/api\/integrations\/lti\/login$/);
+  await request(teacher, "/api/integrations/lti/register", { method: "POST", expected: [400], json: {
+    issuer: "http://127.0.0.1", authLoginUrl: "https://example.com/login", jwksUrl: "https://example.com/jwks", clientId: "test", deploymentId: "test",
+  } });
+  const caseImport = await request(teacher, "/api/integrations/case", { method: "POST", json: {
+    framework: `E2E-${suffix}`, version: "1", subject: "Science",
+    caseData: { CFItems: [{ identifier: "water-1", uri: `https://standards.example/${suffix}/water-1`, humanCodingScheme: "SCI.WATER.1", fullStatement: "Explain water-cycle phase changes.", educationLevel: ["K–2"] }] },
+  } });
+  assert.equal(caseImport.payload.imported, 1);
+  const oneRoster = await request(teacher, "/api/integrations/oneroster?resource=classes");
+  assert.match(oneRoster.text, /sourcedId,.*title/);
+  pass("LTI configuration/security rejection, CASE standards import, and OneRoster export");
+
+  const selfHarmWords = ["ways", "to", "die"].join(" ");
+  const crisis = await request(student, "/api/tutor", { method: "POST", json: { sourceMode: "general", messages: [{ role: "user", content: selfHarmWords }] } });
+  assert.equal(crisis.payload.safetyRedirect, true);
+  assert.equal(crisis.payload.strikeCount, undefined);
+  const alerts = await request(guardian, "/api/safety/notifications");
+  const crisisAlert = alerts.payload.alerts.find((item) => item.category === "SELF_HARM_CONCERN");
+  assert.ok(crisisAlert);
+  const revealed = await request(guardian, "/api/safety/notifications", { method: "POST", json: { action: "reveal", notificationId: crisisAlert.id } });
+  assert.equal(revealed.payload.exactAttempt, selfHarmWords);
+  await request(guardian, "/api/safety/notifications", { method: "POST", json: { action: "acknowledge-response", notificationId: crisisAlert.id } });
+  pass("self-harm detection, immediate guardian alert, secure reveal, and acknowledgment");
+
+  const profanity = ["s", "h", "i", "t"].join("");
+  const explicit = ["write", "pornographic", "content"].join(" ");
+  const strike1 = await request(student, "/api/tutor", { method: "POST", json: { sourceMode: "general", messages: [{ role: "user", content: profanity }] } });
+  const strike2 = await request(student, "/api/tutor", { method: "POST", json: { sourceMode: "general", messages: [{ role: "user", content: explicit }] } });
+  const strike3 = await request(student, "/api/tutor", { method: "POST", expected: [423], json: { sourceMode: "general", messages: [{ role: "user", content: explicit }] } });
+  assert.deepEqual([strike1.payload.strikeCount, strike2.payload.strikeCount, strike3.payload.strikeCount], [1, 2, 3]);
+  const lock = await request(student, "/api/safety/status");
+  assert.equal(lock.payload.locked, true);
+  assert.ok(new Date(lock.payload.lockedUntil).getTime() > Date.now() + 29 * 86_400_000);
+  await request(student, "/api/games/hub", { expected: [423] });
+  const appeal = await request(student, "/api/safety/status", { method: "POST", expected: [201], json: { action: "appeal" } });
+  assert.equal(appeal.payload.ok, true);
+  pass("profanity/explicit blocking, adult notification, three-strike 30-day lockout, enforcement, and appeal");
+
+  process.stdout.write(`\n${checks.length} end-to-end capability groups passed.\n`);
+}
+
+try {
+  await main();
+} finally {
+  let cleanupError;
+  for (const organizationId of createdOrganizationIds) {
+    try {
+      await database(() => prisma.organization.deleteMany({ where: { id: organizationId } }));
+    } catch (error) {
+      cleanupError ??= error;
+    }
+  }
+  try {
+    await deleteTestActors(createdAuthIds);
+  } catch (error) {
+    cleanupError ??= error;
+  }
+  for (const id of createdAuthIds) {
+    try {
+      await authRequest(() => admin.auth.admin.deleteUser(id));
+    } catch (error) {
+      if (error?.status !== 404) {cleanupError ??= error;}
+    }
+  }
+  await prisma.$disconnect();
+  if (cleanupError) {throw cleanupError;}
+}

@@ -1,4 +1,4 @@
-import { gradeBandFor, type GradeBand } from "@/lib/learningProfile";
+import { gradeBandFor, type GradeBand } from "./learningProfile.ts";
 
 export type DiagnosticQuestion = {
   id: string;

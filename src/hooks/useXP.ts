@@ -1,12 +1,12 @@
 // src/hooks/useXP.ts
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export function useXP() {
   const [xp, setXP] = useState(0);
   const [level, setLevel] = useState(1);
 
-  useEffect(() => {
-    fetch("/api/xp")
+  const refreshXP = useCallback(() => {
+    return fetch("/api/xp", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         setXP(data.xp);
@@ -18,20 +18,13 @@ export function useXP() {
       });
   }, []);
 
-  function addXP(amount: number) {
-    setXP((prev) => {
-      const next = prev + amount;
-      setLevel(calculateLevel(next));
+  useEffect(() => {
+    void refreshXP();
+  }, [refreshXP]);
 
-      fetch("/api/xp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount }),
-      });
-
-      return next;
-    });
-  }
+  // Rewards are calculated and persisted by the server-side learning or game
+  // action. This method only refreshes the authoritative balance.
+  const addXP = useCallback((_serverAward: number) => refreshXP(), [refreshXP]);
 
   return { xp, level, addXP };
 }

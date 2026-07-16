@@ -22,14 +22,26 @@ export async function getApiUser(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<User | null> {
+  res.setHeader("Cache-Control", "private, no-store, max-age=0");
   const supabase = createPagesServerClient({ req, res });
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  let result = await supabase.auth.getUser();
+  if (result.error && isRetryableAuthError(result.error)) {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    result = await supabase.auth.getUser();
+  }
+  const { data: { user }, error } = result;
 
   if (error || !user) {return null;}
   return user;
+}
+
+function isRetryableAuthError(error: { name?: string; message?: string; status?: number }) {
+  const detail = `${error.name ?? ""} ${error.message ?? ""}`.toLowerCase();
+  return detail.includes("retryable") ||
+    detail.includes("fetch failed") ||
+    detail.includes("network") ||
+    detail.includes("connection") ||
+    (typeof error.status === "number" && error.status >= 500);
 }
 
 export async function requireApiUser(

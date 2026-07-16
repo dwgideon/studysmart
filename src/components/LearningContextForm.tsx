@@ -96,7 +96,9 @@ export default function LearningContextForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = (await response.json()) as {
+      const data = (await response.json().catch(() => ({
+        error: "The learning profile service returned an unreadable response. Please try again.",
+      }))) as {
         error?: string;
         course?: { id: string };
         requiresGuardianConsent?: boolean;
