@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { withApiMonitoring } from "@/lib/apiMonitoring";
 import { Prisma } from "@prisma/client";
 import { openai } from "@/lib/openai";
-import { prisma } from "@/lib/prisma";
+import { databaseTransaction, prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
 import { getPrimaryCourse } from "@/lib/concepts";
 import { parseAiJson } from "@/lib/parseAiJson";
@@ -20,6 +20,8 @@ import {
   type DiagnosticResponse,
 } from "@/lib/diagnostic";
 import { isAiFreeTestMode } from "@/lib/aiFreeTestMode";
+import { withAiCredits } from "@/lib/aiCredits";
+import { AI_CREDIT_COSTS } from "@/lib/plans";
 
 const QUESTION_COUNT = 6;
 
@@ -82,22 +84,22 @@ async function startDiagnostic(userId: string, res: NextApiResponse) {
     const context = `Grade: ${profile.gradeLevel}. Course: ${course.name}. Subject: ${course.subject}. Learning goal: ${course.learningGoal ?? profile.primaryLearningGoal ?? "build mastery"}.`;
     const contextSafety = await moderateK12Content(userId, context, "DIAGNOSTIC_CONTEXT");
     if (!contextSafety.allowed) {throw new Error("Unsafe diagnostic context");}
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
-      max_tokens: 2200,
-      messages: [
-        {
-          role: "system",
-          content:
-            `${K12_SAFETY_PROMPT}\n\nCreate 10 safe, age-appropriate K-12 readiness questions. Questions must diagnose prerequisites, not trivia. Cover difficulty 1 through 5, use unambiguous A-D choices, and include no sensitive personal questions. Include an estimated item discrimination from 0.5 to 2, guessing probability from 0.05 to 0.35, and a recognized K-12 standard code only when confident. Return JSON only: {"questions":[{"id":"q1","concept":"short skill","prerequisite":"earlier skill or null","prompt":"","options":{"A":"","B":"","C":"","D":""},"answer":"A","difficulty":1,"discrimination":1,"guessing":0.2,"standardCode":null,"reason":"why this predicts readiness"}]}`,
-        },
-        {
-          role: "user",
-          content: context,
-        },
-      ],
-    });
+    const completion = await withAiCredits(
+      { userId, feature: "DIAGNOSTIC", model: "gpt-4o-mini", credits: AI_CREDIT_COSTS.diagnostic },
+      () => openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        max_tokens: 2200,
+        messages: [
+          {
+            role: "system",
+            content:
+              `${K12_SAFETY_PROMPT}\n\nCreate 10 safe, age-appropriate K–12 readiness questions. Questions must diagnose prerequisites, not trivia. Cover difficulty 1 through 5, use unambiguous A-D choices, and include no sensitive personal questions. Include an estimated item discrimination from 0.5 to 2, guessing probability from 0.05 to 0.35, and a recognized K–12 standard code only when confident. Return JSON only: {"questions":[{"id":"q1","concept":"short skill","prerequisite":"earlier skill or null","prompt":"","options":{"A":"","B":"","C":"","D":""},"answer":"A","difficulty":1,"discrimination":1,"guessing":0.2,"standardCode":null,"reason":"why this predicts readiness"}]}`,
+          },
+          { role: "user", content: context },
+        ],
+      })
+    );
     const raw = completion.choices[0].message.content;
     const outputSafety = await moderateK12Content(userId, raw ?? "", "DIAGNOSTIC_OUTPUT");
     if (!outputSafety.allowed) {throw new Error("Unsafe diagnostic output");}
@@ -243,7 +245,7 @@ async function completeDiagnostic(
     })),
   };
 
-  await prisma.$transaction(async (tx) => {
+  await databaseTransaction(async (tx) => {
     for (const result of results) {
       const normalizedName = normalizeConceptName(result.concept);
       const concept = await tx.concept.upsert({

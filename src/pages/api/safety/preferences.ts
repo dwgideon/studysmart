@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === "GET") {
-    const [preference, pushSubscriptions] = await Promise.all([
+    const [preference, pushSubscriptions, mobileDevices] = await Promise.all([
       prisma.safetyContactPreference.upsert({
         where: { userId: authUser.id },
         create: { userId: authUser.id },
@@ -26,13 +26,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       prisma.pushSubscription.count({
         where: { userId: authUser.id, active: true },
       }),
+      prisma.mobileDevice.count({
+        where: { userId: authUser.id, active: true, pushToken: { not: null } },
+      }),
     ]);
     return res.status(200).json({
       emailEnabled: preference.emailEnabled,
       smsEnabled: preference.smsEnabled,
       pushEnabled: preference.pushEnabled,
       hasPhone: Boolean(preference.phoneCiphertext),
-      hasPushSubscription: pushSubscriptions > 0,
+      hasPushSubscription: pushSubscriptions > 0 || mobileDevices > 0,
+      hasMobileDevice: mobileDevices > 0,
       vapidPublicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null,
     });
   }

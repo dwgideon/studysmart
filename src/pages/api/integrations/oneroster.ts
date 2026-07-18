@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import type { Prisma } from "@prisma/client";
 import { requireApiUser } from "@/lib/auth";
 import { parseCsv, serializeCsv } from "@/lib/interoperability/csv";
-import { prisma } from "@/lib/prisma";
+import { databaseTransaction, prisma } from "@/lib/prisma";
 
 async function verifiedTeacher(userId: string) {
   return prisma.user.findFirst({
@@ -131,7 +131,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (match?.accountRole === "STUDENT") {internalByExternalUser.set(externalId, match.id);}
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await databaseTransaction(async (tx) => {
     const classroomByExternal = new Map<string, string>();
     for (const item of classes.slice(0, 500)) {
       if (!item.sourcedId || !item.title) {continue;}

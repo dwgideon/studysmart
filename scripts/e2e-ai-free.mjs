@@ -320,6 +320,7 @@ async function main() {
   pass("protected APIs reject anonymous access");
 
   const student = await createActor("student");
+  const classmate = await createActor("classmate");
   const guardian = await createActor("guardian");
   const teacherDomain = `${suffix}.school.test`;
   const teacher = await createActor("teacher", teacherDomain);
@@ -459,6 +460,79 @@ async function main() {
   assert.equal(equipped.payload.equipped, true);
   pass("Knowledge Grid, Build Lab materials, XP, Sparks, leaderboard history, avatar purchase, and equip");
 
+  await saveProfile(classmate, "9", "TEEN");
+  const multiplayerBefore = await request(classmate, "/api/games/hub");
+  const liveRoom = await request(student, "/api/games/multiplayer", {
+    method: "POST",
+    expected: [201],
+    json: { action: "create" },
+  });
+  assert.match(liveRoom.payload.room.code, /^[A-HJ-NP-Z2-9]{6}$/);
+  assert.equal(liveRoom.payload.room.isHost, true);
+  assert.equal(liveRoom.payload.players.length, 1);
+  assert.equal(liveRoom.payload.question, null);
+  await request(null, `/api/games/multiplayer?code=${liveRoom.payload.room.code}`, { expected: [401] });
+  const joinedRoom = await request(classmate, "/api/games/multiplayer", {
+    method: "POST",
+    json: { action: "join", code: liveRoom.payload.room.code },
+  });
+  assert.equal(joinedRoom.payload.players.length, 2);
+  assert.equal(new Set(joinedRoom.payload.players.map((player) => player.alias)).size, 2);
+  assert.ok(joinedRoom.payload.players.every((player) => !/E2E|@/i.test(player.alias)));
+
+  let liveState = await request(student, "/api/games/multiplayer", {
+    method: "POST",
+    json: { action: "start", code: liveRoom.payload.room.code },
+  });
+  assert.equal(liveState.payload.room.phase, "QUESTION");
+  assert.equal("correctIndex" in liveState.payload.question, false);
+  assert.equal("correctAnswer" in liveState.payload.question, false);
+  assert.equal("cardId" in liveState.payload.question, false);
+
+  for (let questionIndex = 0; questionIndex < liveState.payload.room.totalQuestions; questionIndex += 1) {
+    const storedRoom = await database(() => prisma.multiplayerRoom.findUniqueOrThrow({
+      where: { code: liveRoom.payload.room.code },
+    }));
+    const storedQuestion = storedRoom.questions[questionIndex];
+    const hostAnswer = await request(student, "/api/games/multiplayer", {
+      method: "POST",
+      json: { action: "answer", code: liveRoom.payload.room.code, selectedIndex: storedQuestion.correctIndex },
+    });
+    assert.equal(hostAnswer.payload.me.selectedIndex, storedQuestion.correctIndex);
+    await request(student, "/api/games/multiplayer", {
+      method: "POST",
+      expected: [409],
+      json: { action: "answer", code: liveRoom.payload.room.code, selectedIndex: storedQuestion.correctIndex },
+    });
+    await request(classmate, "/api/games/multiplayer", {
+      method: "POST",
+      json: { action: "answer", code: liveRoom.payload.room.code, selectedIndex: storedQuestion.correctIndex },
+    });
+    const reveal = await request(student, "/api/games/multiplayer", {
+      method: "POST",
+      json: { action: "reveal", code: liveRoom.payload.room.code },
+    });
+    assert.equal(reveal.payload.room.phase, "REVEAL");
+    assert.equal(reveal.payload.question.correctIndex, storedQuestion.correctIndex);
+    assert.equal(reveal.payload.answeredCount, 2);
+    assert.equal(reveal.payload.distribution.reduce((sum, option) => sum + option.count, 0), 2);
+    liveState = await request(student, "/api/games/multiplayer", {
+      method: "POST",
+      json: { action: "next", code: liveRoom.payload.room.code },
+    });
+  }
+  assert.equal(liveState.payload.room.status, "FINISHED");
+  assert.equal(liveState.payload.players.length, 2);
+  assert.ok(liveState.payload.players.every((player) => player.score > 0));
+  const multiplayerAfter = await request(classmate, "/api/games/hub");
+  assert.ok(multiplayerAfter.payload.player.xp > multiplayerBefore.payload.player.xp);
+  assert.ok(multiplayerAfter.payload.player.sparks > multiplayerBefore.payload.player.sparks);
+  await request(student, "/api/games/multiplayer", {
+    method: "POST",
+    json: { action: "close", code: liveRoom.payload.room.code },
+  });
+  pass("student-hosted multiplayer create, private code, safe aliases, join, synchronized rounds, scoring, rewards, reveal, results, and close");
+
   const trustSaved = await request(student, "/api/trust", {
     method: "POST",
     json: {
@@ -471,6 +545,8 @@ async function main() {
   const exported = await request(student, "/api/privacy/export");
   assert.equal(exported.payload.user.id, student.id);
   assert.ok(Array.isArray(exported.payload.masteries));
+  assert.ok(exported.payload.multiplayerRoomsHosted.some((room) => room.code === liveRoom.payload.room.code));
+  assert.ok(exported.payload.multiplayerParticipations.some((participant) => participant.room.code === liveRoom.payload.room.code));
   pass("privacy, accessibility, retention preferences, and complete data export");
 
   const qtiExport = await request(student, `/api/integrations/qti?quizId=${savedQuiz.payload.quizId}`);

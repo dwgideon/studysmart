@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { prisma } from "@/lib/prisma";
+import { databaseTransaction, prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
 import { recordMasteryEvidence } from "@/lib/masteryService";
 
@@ -65,7 +65,7 @@ export default async function handler(
         })
       : null;
 
-    const saved = await prisma.$transaction(async (tx) => {
+    const saved = await databaseTransaction(async (tx) => {
       const quiz = await tx.savedQuiz.create({
         data: {
           userId: user.id,

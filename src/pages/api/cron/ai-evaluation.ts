@@ -3,6 +3,7 @@ import {
   aggregateAiMetrics,
   runLocalSafetyEval,
 } from "@/lib/aiObservability";
+import { releaseStaleAiReservations } from "@/lib/aiCredits";
 import { requestIdFromHeaders, runOperationalJob, secureBearerMatches } from "@/lib/operations";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -19,11 +20,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     "ai-evaluation",
     requestIdFromHeaders(req.headers),
     async () => {
-      const [evaluation, aggregation] = await Promise.all([
+      const [evaluation, aggregation, usageRecovery] = await Promise.all([
         runLocalSafetyEval(),
         aggregateAiMetrics(),
+        releaseStaleAiReservations(),
       ]);
-      return { evaluation, aggregation };
+      return { evaluation, aggregation, usageRecovery };
     }
   );
   return res.status(evaluation.status === "PASSED" ? 200 : 503).json({

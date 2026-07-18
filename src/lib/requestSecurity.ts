@@ -21,7 +21,11 @@ function trustedMutationOrigins(req: Pick<NextApiRequest, "headers">) {
     const origin = originOf(configured);
     if (origin) {origins.add(origin);}
   }
-  const host = req.headers["x-forwarded-host"] ?? req.headers.host;
+  // `x-forwarded-host` can be supplied by an untrusted client unless every
+  // proxy in front of the app is known to overwrite it. The browser-controlled
+  // Host header is forbidden to scripts and is therefore the safe fallback
+  // for same-origin browser mutations when no canonical URL is configured.
+  const host = req.headers.host;
   const hostValue = Array.isArray(host) ? host[0] : host;
   if (hostValue) {
     const forwardedProto = req.headers["x-forwarded-proto"];

@@ -8,7 +8,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authUser = await requireApiUser(req, res);
   if (!authUser) {return;}
 
-  const [user, profile, settings, courses, sessions, masteries, quizzes, notes, sources, conversations, consents, organizationMemberships, experimentAssignments, experimentEvents, aiTraces, safetyEvents, auditEvents] = await Promise.all([
+  const [user, profile, settings, courses, sessions, masteries, quizzes, notes, sources, conversations, consents, organizationMemberships, experimentAssignments, experimentEvents, aiTraces, aiUsageMonths, aiUsageEvents, billingSubscriptions, safetyEvents, multiplayerRoomsHosted, multiplayerParticipations, auditEvents] = await Promise.all([
     prisma.user.findUnique({
       where: { id: authUser.id },
       select: { id: true, email: true, name: true, accountRole: true, ageGroup: true, xp: true, plan: true, createdAt: true },
@@ -30,7 +30,36 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     prisma.experimentAssignment.findMany({ where: { userId: authUser.id } }),
     prisma.experimentEvent.findMany({ where: { userId: authUser.id } }),
     prisma.aiInteractionTrace.findMany({ where: { userId: authUser.id } }),
+    prisma.aiUsageMonth.findMany({ where: { userId: authUser.id } }),
+    prisma.aiUsageEvent.findMany({ where: { userId: authUser.id } }),
+    prisma.billingSubscription.findMany({
+      where: { OR: [{ payerUserId: authUser.id }, { beneficiaryUserId: authUser.id }] },
+      select: {
+        id: true, payerUserId: true, beneficiaryUserId: true, priceId: true,
+        plan: true, status: true, currentPeriodEnd: true, cancelAtPeriodEnd: true,
+        createdAt: true, updatedAt: true,
+      },
+    }),
     prisma.safetyEvent.findMany({ where: { userId: authUser.id } }),
+    prisma.multiplayerRoom.findMany({
+      where: { hostUserId: authUser.id },
+      select: {
+        id: true, code: true, mode: true, status: true, phase: true,
+        currentQuestion: true, expiresAt: true, completedAt: true, createdAt: true,
+      },
+    }),
+    prisma.multiplayerParticipant.findMany({
+      where: { userId: authUser.id },
+      include: {
+        answers: true,
+        room: {
+          select: {
+            id: true, code: true, mode: true, status: true, phase: true,
+            currentQuestion: true, completedAt: true, createdAt: true,
+          },
+        },
+      },
+    }),
     prisma.auditEvent.findMany({ where: { OR: [{ actorUserId: authUser.id }, { subjectId: authUser.id }] }, orderBy: { createdAt: "desc" } }),
   ]);
 
@@ -44,7 +73,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     user, profile, privacySettings: settings, courses, sessions, masteries,
     quizzes, notes, sources, tutorConversations: conversations, consents,
     organizationMemberships, experimentAssignments, experimentEvents,
-    aiInteractionTraces: aiTraces, safetyEvents, auditEvents,
+    aiInteractionTraces: aiTraces, aiUsageMonths, aiUsageEvents,
+    billingSubscriptions, safetyEvents, multiplayerRoomsHosted,
+    multiplayerParticipations, auditEvents,
   });
 }
 

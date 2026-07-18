@@ -125,6 +125,11 @@ function GameWorld() {
 
       {tab === "play" && !run && <section className={styles.arcade}>
         {elementaryMode && <div className={styles.companionWelcome}><TalkingCompanion companion={hub.experience.companion} text={greeting} speechRate={hub.experience.speechRate} autoRead={voiceSessionOn && hub.experience.readAloud} autoKey={`welcome-${voiceSessionOn}`} /><button className={styles.voiceStart} onClick={() => setVoiceSessionOn((current) => !current)}>{voiceSessionOn ? "🔇 Turn off automatic reading" : `🔊 Start ${hub.experience.companion.name}’s voice`}</button><p>The words always stay on screen. You can pause, replay, or turn the voice off any time.</p></div>}
+        <article className={`${styles.modeCard} ${styles.liveCard}`}>
+          <div className={styles.cardGlow} /><div><p className={styles.modeTag}>LIVE MASTERY ARENA</p><h2>Create a room. Invite your crew.</h2><p>Host a safe private Knowledge Grid, receive a six-character code, and send it to other signed-in students.</p></div>
+          <div className={styles.livePreview}><span>YOU HOST</span><b>ABC234</b><em>up to 30 players</em></div>
+          <Link className={styles.primaryButton} href="/multiplayer">Create or join a live room <span>→</span></Link>
+        </article>
         <article className={`${styles.modeCard} ${styles.gridCard}`}>
           <div className={styles.cardGlow} /><p className={styles.modeTag}>KNOWLEDGE GRID</p><h2>Choose your challenge.</h2><p>Pick a category and point value. Master harder questions for bigger rewards.</p>
           <div className={styles.miniBoard}>{[100,200,300,400,500,600].map((value) => <span key={value}>{value}</span>)}</div>

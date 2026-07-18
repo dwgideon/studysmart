@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireApiUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { databaseTransaction, prisma } from "@/lib/prisma";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authUser = await requireApiUser(req, res);
@@ -47,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!violation) {
       return res.status(404).json({ error: "No safety decision is available to appeal." });
     }
-    const request = await prisma.$transaction(async (tx) => {
+    const request = await databaseTransaction(async (tx) => {
       const existing = await tx.dataRightsRequest.findFirst({
         where: {
           userId: authUser.id,

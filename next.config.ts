@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  async rewrites() {
+    return [
+      { source: "/.well-known/apple-app-site-association", destination: "/api/mobile/association/apple" },
+      { source: "/.well-known/assetlinks.json", destination: "/api/mobile/association/android" },
+    ];
+  },
   async headers() {
     return [
       {
@@ -58,6 +64,13 @@ const nextConfig: NextConfig = {
       {
         source: "/api/trust",
         headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0" }],
+      },
+      {
+        source: "/.well-known/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=3600, s-maxage=3600" },
+          { key: "X-Robots-Tag", value: "noindex" },
+        ],
       },
     ];
   },

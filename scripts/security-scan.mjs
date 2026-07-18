@@ -8,8 +8,10 @@ const files = execFileSync(
 )
   .split("\0")
   .filter(Boolean);
+const allowedEnvironmentTemplates = /(^|\/)\.env\.(?:example|sample|template)$/i;
 const forbiddenFiles = files.filter((file) =>
-  /(^|\/)\.env($|\.)|\.(pem|key|p12|pfx)$/i.test(file)
+  !allowedEnvironmentTemplates.test(file)
+  && /(^|\/)\.env($|\.)|\.(pem|key|p12|pfx)$/i.test(file)
 );
 const patterns = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,

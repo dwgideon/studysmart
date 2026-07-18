@@ -1,4 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
+
+type StreakDatabase = Pick<Prisma.TransactionClient, "studyStreak">;
 
 function startOfDay(d: Date) {
   const x = new Date(d);
@@ -7,17 +10,17 @@ function startOfDay(d: Date) {
 }
 
 /** Updates streak when user completes a study activity. */
-export async function updateUserStreak(userId: string) {
+export async function updateUserStreak(userId: string, database: StreakDatabase = prisma) {
   const today = startOfDay(new Date());
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
 
-  const existing = await prisma.studyStreak.findUnique({
+  const existing = await database.studyStreak.findUnique({
     where: { userId },
   });
 
   if (!existing) {
-    return prisma.studyStreak.create({
+    return database.studyStreak.create({
       data: {
         userId,
         currentStreak: 1,
@@ -42,7 +45,7 @@ export async function updateUserStreak(userId: string) {
 
   const longestStreak = Math.max(existing.longestStreak, currentStreak);
 
-  return prisma.studyStreak.update({
+  return database.studyStreak.update({
     where: { userId },
     data: {
       currentStreak,

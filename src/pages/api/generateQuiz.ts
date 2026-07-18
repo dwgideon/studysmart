@@ -6,6 +6,8 @@ import { enrichQuestionsWithConcepts } from "@/lib/concepts";
 import { prisma } from "@/lib/prisma";
 import { aiAccessForUser, K12_SAFETY_PROMPT, moderateK12Content } from "@/lib/childSafety";
 import { generateLocalQuiz, isAiFreeTestMode } from "@/lib/aiFreeTestMode";
+import { AiCreditLimitError, aiCreditErrorResponse, withAiCredits } from "@/lib/aiCredits";
+import { AI_CREDIT_COSTS } from "@/lib/plans";
 
 function calculateQuestionCount(text: string) {
   const wordCount = text.split(/\s+/).length;
@@ -49,18 +51,21 @@ export default async function handler(
     if (isAiFreeTestMode) {
       questions = generateLocalQuiz(content, questionCount);
     } else {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        temperature: 0.4,
-        max_tokens: 1500,
-        messages: [
-          {
-            role: "system",
-            content: `${K12_SAFETY_PROMPT}\n\nCreate exactly ${questionCount} multiple-choice questions for a grade ${profile?.gradeLevel ?? "6"} student. Match vocabulary and challenge to that age. JSON only: {"questions":[{"question":"","options":{"A":"","B":"","C":"","D":""},"answer":"A","explanation":"","concept":"short reusable topic label"}]}`,
-          },
-          { role: "user", content: content.slice(0, 12_000) },
-        ],
-      });
+      const completion = await withAiCredits(
+        { userId: user.id, feature: "QUIZ_BUILDER", model: "gpt-4o-mini", credits: AI_CREDIT_COSTS.quiz },
+        () => openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          temperature: 0.4,
+          max_tokens: 1500,
+          messages: [
+            {
+              role: "system",
+              content: `${K12_SAFETY_PROMPT}\n\nCreate exactly ${questionCount} multiple-choice questions for a grade ${profile?.gradeLevel ?? "6"} student. Match vocabulary and challenge to that age. JSON only: {"questions":[{"question":"","options":{"A":"","B":"","C":"","D":""},"answer":"A","explanation":"","concept":"short reusable topic label"}]}`,
+            },
+            { role: "user", content: content.slice(0, 12_000) },
+          ],
+        })
+      );
       const raw = completion.choices[0].message?.content;
       const outputSafety = await moderateK12Content(user.id, raw ?? "", "QUIZ_BUILDER_OUTPUT");
       if (!outputSafety.allowed) {return res.status(422).json({ error: "The generated quiz did not pass the K–12 safety check." });}
@@ -78,6 +83,9 @@ export default async function handler(
       ...enriched,
     });
   } catch (err) {
+    if (err instanceof AiCreditLimitError) {
+      return res.status(402).json(aiCreditErrorResponse(err));
+    }
     console.error("Generate quiz error:", err);
     return res.status(500).json({ error: "Failed to generate quiz" });
   }

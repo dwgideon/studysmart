@@ -15,8 +15,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const user = await requireApiUser(req, res);
   if (!user) {return;}
 
-  const [account, learnerProfile, profile, owned, recentRuns, leaders] = await Promise.all([
-    prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { name: true, xp: true } }),
+  const account = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { name: true, xp: true },
+  });
+  if (!account) {
+    return res.status(409).json({
+      code: "ACCOUNT_SYNC_PENDING",
+      error: "Your learning account is still syncing. Please try again.",
+    });
+  }
+  const [learnerProfile, profile, owned, recentRuns, leaders] = await Promise.all([
     prisma.learnerProfile.findUnique({ where: { userId: user.id }, select: { gradeLevel: true } }),
     prisma.gameProfile.upsert({ where: { userId: user.id }, create: { userId: user.id }, update: {} }),
     prisma.avatarItemOwnership.findMany({ where: { userId: user.id }, select: { itemId: true } }),

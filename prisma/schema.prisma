@@ -51,6 +51,7 @@ model User {
   safetyNotifications     SafetyNotification[]
   safetyContactPreference SafetyContactPreference?
   pushSubscriptions       PushSubscription[]
+  mobileDevices           MobileDevice[]
   dataRightsRequests      DataRightsRequest[]
   auditEvents             AuditEvent[]
   integrationConnections  IntegrationConnection[]
@@ -62,8 +63,72 @@ model User {
   gameProfile             GameProfile?
   gameRuns                GameRun[]
   avatarItems             AvatarItemOwnership[]
+  multiplayerRoomsHosted  MultiplayerRoom[]        @relation("MultiplayerRoomHost")
+  multiplayerParticipants MultiplayerParticipant[]
+  subscriptionsPaid       BillingSubscription[]    @relation("SubscriptionPayer")
+  subscriptionsReceived   BillingSubscription[]    @relation("SubscriptionBeneficiary")
+  aiUsageMonths           AiUsageMonth[]
+  aiUsageEvents           AiUsageEvent[]
 
   @@index([email])
+}
+
+model BillingSubscription {
+  id                String    @id
+  payerUserId       String    @db.Uuid
+  beneficiaryUserId String    @db.Uuid
+  stripeCustomerId  String
+  priceId           String
+  plan              String
+  status            String
+  currentPeriodEnd  DateTime?
+  cancelAtPeriodEnd Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  payer       User @relation("SubscriptionPayer", fields: [payerUserId], references: [id], onDelete: Cascade)
+  beneficiary User @relation("SubscriptionBeneficiary", fields: [beneficiaryUserId], references: [id], onDelete: Cascade)
+
+  @@index([payerUserId, status])
+  @@index([beneficiaryUserId, status])
+  @@index([stripeCustomerId])
+}
+
+model BillingWebhookEvent {
+  id           String    @id
+  type         String
+  processingAt DateTime?
+  processedAt  DateTime?
+  failedAt     DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+model AiUsageMonth {
+  userId      String   @db.Uuid
+  month       DateTime
+  creditsUsed Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, month])
+  @@index([month])
+}
+
+model AiUsageEvent {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @db.Uuid
+  feature   String
+  model     String
+  credits   Int
+  status    String    @default("RESERVED")
+  createdAt DateTime  @default(now())
+  settledAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
 
 model GameProfile {
@@ -114,6 +179,72 @@ model GameRun {
   @@index([userId, completedAt])
 }
 
+model MultiplayerRoom {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                 String    @unique
+  hostUserId           String    @db.Uuid
+  mode                 String    @default("GRID")
+  status               String    @default("LOBBY")
+  phase                String    @default("LOBBY")
+  questions            Json
+  currentQuestion      Int       @default(-1)
+  roundDurationSeconds Int       @default(30)
+  maxPlayers           Int       @default(30)
+  roundStartedAt       DateTime?
+  roundEndsAt          DateTime?
+  expiresAt            DateTime
+  completedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  host         User                     @relation("MultiplayerRoomHost", fields: [hostUserId], references: [id], onDelete: Cascade)
+  participants MultiplayerParticipant[]
+  answers      MultiplayerAnswer[]
+
+  @@index([hostUserId, status, expiresAt])
+  @@index([status, expiresAt])
+}
+
+model MultiplayerParticipant {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roomId         String    @db.Uuid
+  userId         String    @db.Uuid
+  alias          String
+  score          Int       @default(0)
+  correctCount   Int       @default(0)
+  xpEarned       Int       @default(0)
+  sparksEarned   Int       @default(0)
+  rewardsEnabled Boolean   @default(true)
+  joinedAt       DateTime  @default(now())
+  leftAt         DateTime?
+
+  room    MultiplayerRoom     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers MultiplayerAnswer[]
+
+  @@unique([roomId, userId])
+  @@unique([roomId, alias])
+  @@index([userId, joinedAt])
+}
+
+model MultiplayerAnswer {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roomId        String   @db.Uuid
+  participantId String   @db.Uuid
+  questionIndex Int
+  selectedIndex Int
+  correct       Boolean
+  points        Int
+  responseMs    Int
+  createdAt     DateTime @default(now())
+
+  room        MultiplayerRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  participant MultiplayerParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, questionIndex])
+  @@index([roomId, questionIndex])
+}
+
 model LearnerProfile {
   id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId              String    @unique @db.Uuid
@@ -156,16 +287,17 @@ model Course {
 }
 
 model StudySession {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId           String   @db.Uuid
-  courseId         String?  @db.Uuid
-  sourceMaterialId String?  @db.Uuid
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String    @db.Uuid
+  courseId         String?   @db.Uuid
+  sourceMaterialId String?   @db.Uuid
   title            String?
-  createdAt        DateTime @default(now())
-  totalCards       Int      @default(0)
-  correct          Int      @default(0)
-  incorrect        Int      @default(0)
-  completed        Boolean  @default(false)
+  createdAt        DateTime  @default(now())
+  totalCards       Int       @default(0)
+  correct          Int       @default(0)
+  incorrect        Int       @default(0)
+  completed        Boolean   @default(false)
+  completedAt      DateTime?
 
   user           User            @relation(fields: [userId], references: [id])
   course         Course?         @relation(fields: [courseId], references: [id], onDelete: SetNull)
@@ -177,6 +309,7 @@ model StudySession {
   @@index([courseId])
   @@index([sourceMaterialId])
   @@index([createdAt])
+  @@index([userId, completedAt])
 }
 
 model Flashcard {
@@ -484,6 +617,7 @@ model MasteryEvidence {
 model CardReview {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId         String   @db.Uuid
+  clientEventId  String?
   flashcardId    String   @db.Uuid
   sessionId      String?  @db.Uuid
   correct        Boolean
@@ -496,6 +630,7 @@ model CardReview {
   flashcard Flashcard     @relation(fields: [flashcardId], references: [id])
   session   StudySession? @relation(fields: [sessionId], references: [id])
 
+  @@unique([userId, clientEventId])
   @@index([userId])
   @@index([flashcardId])
   @@index([sessionId])
@@ -789,6 +924,25 @@ model PushSubscription {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, active])
+}
+
+model MobileDevice {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @db.Uuid
+  installationId String   @unique
+  platform       String
+  pushToken      String?
+  appVersion     String?
+  active         Boolean  @default(true)
+  lastSeenAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, active])
+  @@index([pushToken, active])
+  @@index([lastSeenAt])
 }
 
 model SafetyDelivery {

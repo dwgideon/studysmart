@@ -6,6 +6,8 @@ import { enrichQuestionsWithConcepts } from "@/lib/concepts";
 import { prisma } from "@/lib/prisma";
 import { aiAccessForUser, K12_SAFETY_PROMPT, moderateK12Content } from "@/lib/childSafety";
 import { generateLocalQuiz, isAiFreeTestMode } from "@/lib/aiFreeTestMode";
+import { AiCreditLimitError, aiCreditErrorResponse, withAiCredits } from "@/lib/aiCredits";
+import { AI_CREDIT_COSTS } from "@/lib/plans";
 
 export default async function handler(
   req: NextApiRequest,
@@ -44,18 +46,21 @@ export default async function handler(
     if (isAiFreeTestMode) {
       questions = generateLocalQuiz(lesson, questionCount);
     } else {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        temperature: 0.4,
-        max_tokens: 1500,
-        messages: [
-          {
-            role: "system",
-            content: `${K12_SAFETY_PROMPT}\n\nCreate a ${questionCount}-question multiple-choice quiz for a grade ${profile?.gradeLevel ?? "6"} student. Use age-appropriate vocabulary and challenge. Each question must contain: question, options A-D, answer letter, explanation, and a short reusable concept label. Respond ONLY with JSON: {"questions":[...]}`,
-          },
-          { role: "user", content: lesson.slice(0, 12_000) },
-        ],
-      });
+      const completion = await withAiCredits(
+        { userId: user.id, feature: "QUIZ", model: "gpt-4o-mini", credits: AI_CREDIT_COSTS.quiz },
+        () => openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          temperature: 0.4,
+          max_tokens: 1500,
+          messages: [
+            {
+              role: "system",
+              content: `${K12_SAFETY_PROMPT}\n\nCreate a ${questionCount}-question multiple-choice quiz for a grade ${profile?.gradeLevel ?? "6"} student. Use age-appropriate vocabulary and challenge. Each question must contain: question, options A-D, answer letter, explanation, and a short reusable concept label. Respond ONLY with JSON: {"questions":[...]}`,
+            },
+            { role: "user", content: lesson.slice(0, 12_000) },
+          ],
+        })
+      );
       const raw = completion.choices[0].message?.content;
       const outputSafety = await moderateK12Content(user.id, raw ?? "", "QUIZ_OUTPUT");
       if (!outputSafety.allowed) {return res.status(422).json({ error: "The generated quiz did not pass the K–12 safety check." });}
@@ -69,6 +74,9 @@ export default async function handler(
     const enriched = await enrichQuestionsWithConcepts(user.id, questions);
     return res.status(200).json(enriched);
   } catch (err) {
+    if (err instanceof AiCreditLimitError) {
+      return res.status(402).json(aiCreditErrorResponse(err));
+    }
     console.error("Quiz API error:", err);
     return res.status(500).json({ error: "AI quiz failed." });
   }

@@ -4,6 +4,8 @@ import type { User } from "@supabase/supabase-js";
 import { ensureUser } from "@/lib/ensureUser";
 import { prisma } from "@/lib/prisma";
 import { isTrustedMutationRequest } from "@/lib/requestSecurity";
+import { bearerTokenFromHeader } from "@/lib/mobileAuth";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 const LOCK_EXEMPT_API_PREFIXES = [
   "/api/community",
@@ -24,12 +26,17 @@ export async function getApiUser(
   res: NextApiResponse
 ): Promise<User | null> {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
-  const supabase = createPagesServerClient({ req, res });
-  let result = await supabase.auth.getUser();
-  if (result.error && isRetryableAuthError(result.error)) {
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    result = await supabase.auth.getUser();
+  const bearerToken = bearerTokenFromHeader(req.headers.authorization);
+  const supabase = bearerToken
+    ? supabaseAdmin
+    : createPagesServerClient({ req, res });
+  let result;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    result = await supabase.auth.getUser(bearerToken ?? undefined);
+    if (!result.error || !isRetryableAuthError(result.error) || attempt === 3) {break;}
+    await new Promise((resolve) => setTimeout(resolve, 150 * attempt));
   }
+  if (!result) {return null;}
   const { data: { user }, error } = result;
 
   if (error || !user) {return null;}

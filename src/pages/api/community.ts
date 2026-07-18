@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withApiMonitoring } from "@/lib/apiMonitoring";
 import { randomBytes } from "crypto";
-import { prisma } from "@/lib/prisma";
+import { databaseTransaction, prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
 import { cleanText } from "@/lib/learningProfile";
 
@@ -304,7 +304,7 @@ async function handler(
     if (Array.isArray(allowedGradeBands) && !allowedGradeBands.some((item) => item === classroom.gradeBand)) {
       return res.status(403).json({ error: "This classroom is not currently allowed by district policy." });
     }
-    await prisma.$transaction(async (tx) => {
+    await databaseTransaction(async (tx) => {
       await tx.classroomMembership.upsert({
         where: { classroomId_studentId: { classroomId: classroom.id, studentId: user.id } },
         create: { classroomId: classroom.id, studentId: user.id },
@@ -370,7 +370,7 @@ async function handler(
     const instructions = cleanText(req.body?.instructions, 1000);
     if (!title) {return res.status(400).json({ error: "Assignment title is required." });}
     const dueAt = req.body?.dueAt ? new Date(req.body.dueAt) : null;
-    const assignment = await prisma.$transaction(async (tx) => {
+    const assignment = await databaseTransaction(async (tx) => {
       const created = await tx.assignment.create({
         data: {
           classroomId,

@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withApiMonitoring } from "@/lib/apiMonitoring";
-import { prisma } from "@/lib/prisma";
+import { databaseTransaction, prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
 import { updateUserStreak } from "@/lib/streakService";
 import { awardXp } from "@/lib/xp";
@@ -30,16 +30,22 @@ async function handler(
       return res.status(404).json({ error: "Session not found" });
     }
 
-    const session = await prisma.studySession.update({
-      where: { id: sessionId },
-      data: { completed: true },
+    const completedAt = new Date();
+    const result = await databaseTransaction(async (tx) => {
+      const claimed = await tx.studySession.updateMany({
+        where: { id: sessionId, userId: user.id, completed: false },
+        data: { completed: true, completedAt },
+      });
+      const session = await tx.studySession.findUniqueOrThrow({ where: { id: sessionId } });
+      if (claimed.count === 0) {
+        return { duplicate: true, session, xpEarned: 0, xp: null };
+      }
+      const xpEarned = session.correct * 10 + (session.incorrect > 0 ? 5 : 15);
+      await updateUserStreak(user.id, tx);
+      const xp = await awardXp(user.id, xpEarned, tx);
+      return { duplicate: false, session, xpEarned, xp };
     });
-
-    await updateUserStreak(user.id);
-
-    const xpEarned =
-      session.correct * 10 + (session.incorrect > 0 ? 5 : 15);
-    const xp = await awardXp(user.id, xpEarned);
+    const { session, xpEarned, xp, duplicate } = result;
 
     const accuracy =
       session.totalCards > 0
@@ -53,10 +59,11 @@ async function handler(
         incorrect: session.incorrect,
         total: session.totalCards,
         accuracy,
-        completedAt: session.createdAt,
+        completedAt: session.completedAt,
       },
       xpEarned,
       xp,
+      duplicate,
     });
   } catch (error) {
     console.error("study/complete error:", error);

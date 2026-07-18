@@ -35,6 +35,7 @@ export default function AppLayout({ children }: Props) {
         <span>StudySmart · K–12 learning with privacy and safety by design</span>
         <nav aria-label="Policy links">
           <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
           <Link href="/security">Security</Link>
           <Link href="/accessibility">Accessibility</Link>
           <Link href="/subprocessors">Subprocessors</Link>

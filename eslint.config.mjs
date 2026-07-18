@@ -36,5 +36,17 @@ export default tseslint.config(
       eqeqeq: ["error", "always"],
       curly: ["error", "all"],
     },
+  },
+  {
+    files: ["scripts/**/*.mjs"],
+    rules: {
+      "no-console": "off",
+    },
+  },
+  {
+    files: ["apps/mobile/metro.config.js"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
   }
 );

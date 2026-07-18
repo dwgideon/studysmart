@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withApiMonitoring } from "@/lib/apiMonitoring";
-import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { databaseTransaction, prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
 import { recordMasteryEvidence } from "@/lib/masteryService";
 import { scheduleNextReview } from "@/lib/spacedRepetition";
@@ -19,6 +20,9 @@ async function handler(
   }
 
   const { cardId, sessionId, correct } = req.body;
+  const clientEventId = typeof req.body?.clientEventId === "string"
+    ? req.body.clientEventId.trim()
+    : "";
   const rating = [1, 2, 3, 4].includes(Number(req.body?.rating))
     ? Number(req.body.rating) as 1 | 2 | 3 | 4
     : (correct ? 3 : 1);
@@ -32,8 +36,18 @@ async function handler(
   if (!cardId) {
     return res.status(400).json({ error: "Missing cardId" });
   }
+  if (clientEventId && !/^[A-Za-z0-9_-]{16,128}$/.test(clientEventId)) {
+    return res.status(400).json({ error: "Invalid client event identifier" });
+  }
 
   try {
+    if (clientEventId) {
+      const existing = await prisma.cardReview.findUnique({
+        where: { userId_clientEventId: { userId: user.id, clientEventId } },
+        select: { id: true },
+      });
+      if (existing) {return res.status(200).json({ ok: true, duplicate: true });}
+    }
     const card = await prisma.flashcard.findFirst({
       where: { id: cardId, userId: user.id },
       select: {
@@ -61,10 +75,11 @@ async function handler(
       }
     }
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await databaseTransaction(async (tx) => {
       await tx.cardReview.create({
         data: {
           userId: user.id,
+          clientEventId: clientEventId || null,
           flashcardId: card.id,
           sessionId: sessionId ?? null,
           correct: Boolean(correct),
@@ -125,6 +140,9 @@ async function handler(
 
     return res.status(200).json({ ok: true, ...result });
   } catch (error) {
+    if (clientEventId && error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return res.status(200).json({ ok: true, duplicate: true });
+    }
     console.error("study/review error:", error);
     return res.status(500).json({ error: "Failed to record review" });
   }

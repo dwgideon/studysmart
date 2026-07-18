@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withApiMonitoring } from "@/lib/apiMonitoring";
-import { prisma } from "@/lib/prisma";
+import { databaseTransaction, prisma } from "@/lib/prisma";
 import { generateFlashcardsFromText, UnsafeGeneratedContentError } from "@/lib/aiHelpers";
 import { requireApiUser } from "@/lib/auth";
 import { normalizeConceptName } from "@/lib/mastery";
@@ -14,6 +14,12 @@ import {
   ingestStudySource,
   UnsupportedStudyFileError,
 } from "@/lib/sourceIngestion";
+import { AiCreditLimitError, aiCreditErrorResponse, withAiCredits } from "@/lib/aiCredits";
+import { AI_CREDIT_COSTS } from "@/lib/plans";
+
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+const AUDIO_OR_VIDEO_TYPES = /^(?:audio|video)\//;
+const NATIVE_TEXT_TYPES = new Set(["text/plain", "text/markdown", "text/csv", "application/json", "text/html"]);
 
 export const config = {
   api: {
@@ -47,7 +53,9 @@ async function handler(
   try {
     const form = formidable({
       multiples: false,
-      maxFileSize: 20 * 1024 * 1024,
+      // Vercel request bodies have a platform ceiling close to this value.
+      // Larger production uploads should move to signed direct-to-storage ingestion.
+      maxFileSize: MAX_UPLOAD_BYTES,
       maxFieldsSize: 2 * 1024 * 1024,
       allowEmptyFiles: false,
     });
@@ -62,15 +70,13 @@ async function handler(
 
     const access = isAiFreeTestMode ? null : await aiAccessForUser(userId);
     if (access && !access.allowed) {return res.status(428).json({ error: access.reason });}
-    const textLikeUpload = !uploaded ||
-      uploaded.mimetype?.startsWith("text/") ||
-      ["application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.presentationml.presentation"].includes(uploaded.mimetype ?? "");
+    const textLikeUpload = !uploaded || NATIVE_TEXT_TYPES.has(uploaded.mimetype ?? "");
     if (access?.allowed && !access.districtPolicy.multimodalEnabled && !textLikeUpload) {
       return res.status(403).json({
         error: "Your school or district has disabled image, audio, and video processing.",
       });
     }
-    const ingested = await ingestStudySource({
+    const sourceInput = {
       pastedText,
       file: uploaded?.filepath
         ? {
@@ -79,7 +85,29 @@ async function handler(
             mimeType: uploaded.mimetype || "application/octet-stream",
           }
         : undefined,
-    });
+    };
+    const uploadMimeType = uploaded?.mimetype ?? "";
+    const audioOrVideoUpload = AUDIO_OR_VIDEO_TYPES.test(uploadMimeType);
+    const visualOrDocumentUpload = Boolean(uploaded && !NATIVE_TEXT_TYPES.has(uploadMimeType));
+    const ingested = isAiFreeTestMode
+      ? await ingestStudySource(sourceInput)
+      : await withAiCredits(
+          {
+            userId,
+            feature: audioOrVideoUpload ? "SOURCE_AUDIO_VIDEO" : visualOrDocumentUpload ? "SOURCE_MULTIMODAL" : "SOURCE_TEXT",
+            model: visualOrDocumentUpload
+              ? audioOrVideoUpload
+                ? process.env.OPENAI_TRANSCRIPTION_MODEL ?? "gpt-4o-mini-transcribe"
+                : process.env.OPENAI_MULTIMODAL_MODEL ?? "gpt-4.1-mini"
+              : process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small",
+            credits: audioOrVideoUpload
+              ? AI_CREDIT_COSTS.audioOrVideoProcessing
+              : visualOrDocumentUpload
+                ? AI_CREDIT_COSTS.visualOrDocumentProcessing
+                : AI_CREDIT_COSTS.textSourceProcessing,
+          },
+          () => ingestStudySource(sourceInput)
+        );
     const content = ingested.content;
     const safety = await moderateK12Content(userId, content, "MATERIAL_UPLOAD");
     if (!safety.allowed) {
@@ -96,7 +124,12 @@ async function handler(
       orderBy: [{ isPrimary: "desc" }, { updatedAt: "desc" }],
     });
 
-    const flashcards = await generateFlashcardsFromText(content, userId);
+    const flashcards = isAiFreeTestMode
+      ? await generateFlashcardsFromText(content, userId)
+      : await withAiCredits(
+          { userId, feature: "FLASHCARDS", model: "gpt-4o-mini", credits: AI_CREDIT_COSTS.flashcardGeneration },
+          () => generateFlashcardsFromText(content, userId)
+        );
     if (flashcards.length === 0) {
       return res.status(500).json({ error: "No flashcards generated" });
     }
@@ -106,7 +139,7 @@ async function handler(
     const sourceTitle =
       uploaded?.originalFilename?.trim() || sessionTitle;
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await databaseTransaction(async (tx) => {
       const sourceMaterial = await tx.sourceMaterial.create({
         data: {
           userId,
@@ -202,6 +235,9 @@ async function handler(
       needsLearningProfile: !course,
     });
   } catch (error) {
+    if (error instanceof AiCreditLimitError) {
+      return res.status(402).json(aiCreditErrorResponse(error));
+    }
     if (error instanceof UnsafeGeneratedContentError) {
       return res.status(422).json({ error: error.message });
     }
@@ -212,7 +248,7 @@ async function handler(
       error instanceof Error &&
       (error.message.includes("maxFileSize") || error.message.includes("maxTotalFileSize"))
     ) {
-      return res.status(413).json({ error: "Study files must be 20 MB or smaller." });
+      return res.status(413).json({ error: "Study files must be 4 MB or smaller for this release." });
     }
     console.error("Generation error:", error);
     return res.status(500).json({ error: "Generation failed" });

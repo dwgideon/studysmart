@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && node scripts/verify-build-environment.mjs && next build",
     "start": "next start",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/*.test.ts",
     "test:e2e:free": "node --env-file=.env scripts/e2e-ai-free.mjs",
+    "pricing:model": "node scripts/pricing-model.mjs",
     "smoke:deployment": "node scripts/smoke-deployment.mjs",
     "check:security": "npm audit --omit=dev --audit-level=high && node scripts/security-scan.mjs",
     "check:production-env": "node --env-file=.env scripts/verify-production-readiness.mjs",
@@ -16,6 +17,8 @@
     "check:knip": "knip",
     "check:tsprune": "ts-prune -p tsconfig.json",
     "check:deps": "depcheck --ignores='@types/*,eslint*,typescript,ts-node'",
+    "check:mobile": "npm --prefix apps/mobile run lint && npm --prefix apps/mobile run typecheck",
+    "build:mobile": "npm --prefix apps/mobile run test:bundle",
     "check:all": "npm run test && npm run build --silent && npm run check:knip && npm run check:tsprune && npm run check:deps"
   },
   "dependencies": {

@@ -17,12 +17,18 @@ declare namespace NodeJS {
     PRICE_PRO?: string;
     PRICE_UNLIMITED?: string;
     STRIPE_WEBHOOK_SECRET?: string;
+    STRIPE_PORTAL_CONFIGURATION_ID?: string;
     SUPABASE_SERVICE_ROLE_KEY?: string;
     SAFETY_ENCRYPTION_KEY?: string;
     AI_TRACE_HASH_KEY?: string;
     CRON_SECRET?: string;
     OPS_HEALTH_TOKEN?: string;
     OPS_ALERT_WEBHOOK_URL?: string;
+    EXPO_ACCESS_TOKEN?: string;
+    APPLE_APP_TEAM_ID?: string;
+    ANDROID_APP_SHA256_CERT_FINGERPRINT?: string;
+    MOBILE_APP_BUNDLE_ID?: string;
+    MOBILE_ANDROID_PACKAGE?: string;
     SECURITY_CONTACT_EMAIL?: string;
     SUPABASE_ACCESS_TOKEN?: string;
     SUPABASE_PROJECT_REF?: string;

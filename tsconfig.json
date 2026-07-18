@@ -49,6 +49,7 @@
     "out",
     "dist",
     "build",
+    "apps/mobile",
     "supabase"
   ]
 }

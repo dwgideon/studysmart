@@ -166,7 +166,7 @@ export async function runOperationalJob<T extends Record<string, unknown>>(
 
 export async function collectOperationalStatus() {
   const now = Date.now();
-  const [jobs, pendingSafety, exhaustedSafety, failedRetention, failedEvaluation] = await Promise.all([
+  const [jobs, pendingSafety, exhaustedSafety, failedRetention, failedEvaluation, staleAiReservations, failedBillingEvents] = await Promise.all([
     Promise.all(Object.keys(JOB_STALE_AFTER_MS).map(async (job) => {
       const latest = await prisma.operationalRun.findFirst({
         where: { job, status: "COMPLETED" },
@@ -185,6 +185,8 @@ export async function collectOperationalStatus() {
     prisma.safetyDelivery.count({ where: { status: "EXHAUSTED" } }),
     prisma.dataRetentionRun.count({ where: { status: "FAILED", startedAt: { gt: new Date(now - 7 * 86_400_000) } } }),
     prisma.aiEvalRun.count({ where: { status: "FAILED", startedAt: { gt: new Date(now - 7 * 86_400_000) } } }),
+    prisma.aiUsageEvent.count({ where: { status: "RESERVED", createdAt: { lt: new Date(now - 30 * 60_000) } } }),
+    prisma.billingWebhookEvent.count({ where: { processedAt: null, failedAt: { not: null } } }),
   ]);
   const configured = {
     database: Boolean(process.env.DATABASE_URL),
@@ -194,15 +196,33 @@ export async function collectOperationalStatus() {
     dedicatedTraceHashing: Boolean(process.env.AI_TRACE_HASH_KEY),
     detailedHealthAuthentication: Boolean(process.env.OPS_HEALTH_TOKEN),
     failureAlertWebhook: Boolean(process.env.OPS_ALERT_WEBHOOK_URL),
+    openAi: Boolean(process.env.OPENAI_API_KEY),
+    stripeBilling: Boolean(
+      process.env.STRIPE_SECRET_KEY &&
+      process.env.STRIPE_WEBHOOK_SECRET &&
+      process.env.STRIPE_PORTAL_CONFIGURATION_ID &&
+      (process.env.STRIPE_PRICE_ID_STARTER ?? process.env.PRICE_STARTER) &&
+      (process.env.STRIPE_PRICE_ID_PRO ?? process.env.PRICE_PRO) &&
+      (process.env.STRIPE_PRICE_ID_UNLIMITED ?? process.env.PRICE_UNLIMITED)
+    ),
+    externalSafetyDelivery: Boolean(
+      (process.env.RESEND_API_KEY && process.env.SAFETY_FROM_EMAIL) ||
+      (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_SAFETY_FROM_NUMBER) ||
+      (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY)
+    ),
   };
   const unhealthyJobs = jobs.filter((job) => job.status !== "healthy");
+  const criticalConfigurationHealthy = Object.entries(configured)
+    .filter(([key]) => key !== "failureAlertWebhook")
+    .every(([, value]) => value);
   return {
-    status: unhealthyJobs.length || exhaustedSafety || failedRetention || failedEvaluation
+    status: unhealthyJobs.length || exhaustedSafety || failedRetention || failedEvaluation ||
+      staleAiReservations || failedBillingEvents || !criticalConfigurationHealthy || !configured.failureAlertWebhook
       ? "degraded"
       : "healthy",
     jobs,
-    queues: { pendingSafety, exhaustedSafety },
-    recentFailures: { retention: failedRetention, evaluation: failedEvaluation },
+    queues: { pendingSafety, exhaustedSafety, staleAiReservations },
+    recentFailures: { retention: failedRetention, evaluation: failedEvaluation, billingWebhooks: failedBillingEvents },
     configured,
   };
 }

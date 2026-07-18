@@ -22,8 +22,10 @@ function runtimeDatabaseUrl() {
 }
 
 function isRetryableDatabaseError(error: unknown) {
-  return error instanceof Prisma.PrismaClientKnownRequestError &&
-    RETRYABLE_DATABASE_CODES.has(error.code);
+  const code = error instanceof Prisma.PrismaClientKnownRequestError
+    ? error.code
+    : (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" && RETRYABLE_DATABASE_CODES.has(code);
 }
 
 const createPrismaClient = (): PrismaClient => (
@@ -54,6 +56,25 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   createPrismaClient();
+
+export async function databaseTransaction<T>(
+  operation: (tx: Prisma.TransactionClient) => Promise<T>,
+  options?: {
+    maxWait?: number;
+    timeout?: number;
+    isolationLevel?: Prisma.TransactionIsolationLevel;
+  }
+) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await prisma.$transaction(operation, options);
+    } catch (error) {
+      if (!isRetryableDatabaseError(error) || attempt === 3) {throw error;}
+      await new Promise((resolve) => setTimeout(resolve, 150 * attempt));
+    }
+  }
+  throw new Error("Database transaction retry limit reached.");
+}
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;

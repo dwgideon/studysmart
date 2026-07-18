@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireApiUser } from "@/lib/auth";
-import { safeExternalHttpsUrl } from "@/lib/interoperability/lti";
+import { resolvedExternalHttpsUrl } from "@/lib/interoperability/lti";
 import { prisma } from "@/lib/prisma";
 
 function value(input: unknown, max = 500) {
@@ -23,12 +23,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   });
   if (!teacher) {return res.status(403).json({ error: "Verified teacher role required." });}
   try {
-    const issuer = safeExternalHttpsUrl(value(req.body?.issuer)).toString().replace(/\/$/, "");
-    const authLoginUrl = safeExternalHttpsUrl(value(req.body?.authLoginUrl)).toString();
-    const jwksUrl = safeExternalHttpsUrl(value(req.body?.jwksUrl)).toString();
-    const authTokenUrl = req.body?.authTokenUrl
-      ? safeExternalHttpsUrl(value(req.body.authTokenUrl)).toString()
-      : null;
+    const [issuerUrl, loginUrl, keysUrl, tokenUrl] = await Promise.all([
+      resolvedExternalHttpsUrl(value(req.body?.issuer)),
+      resolvedExternalHttpsUrl(value(req.body?.authLoginUrl)),
+      resolvedExternalHttpsUrl(value(req.body?.jwksUrl)),
+      req.body?.authTokenUrl ? resolvedExternalHttpsUrl(value(req.body.authTokenUrl)) : null,
+    ]);
+    const issuer = issuerUrl.toString().replace(/\/$/, "");
+    const authLoginUrl = loginUrl.toString();
+    const jwksUrl = keysUrl.toString();
+    const authTokenUrl = tokenUrl?.toString() ?? null;
     const clientId = value(req.body?.clientId, 240);
     const deploymentId = value(req.body?.deploymentId, 240);
     const name = value(req.body?.name, 160) || new URL(issuer).hostname;

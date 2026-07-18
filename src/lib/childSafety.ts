@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { openai } from "@/lib/openai";
 import { isAiFreeTestMode } from "@/lib/aiFreeTestMode";
-import { prisma } from "@/lib/prisma";
+import { databaseTransaction, prisma } from "@/lib/prisma";
 import {
   decryptSensitiveValue,
   encryptSensitiveValue,
@@ -161,7 +161,7 @@ async function recordSafetyEvent(
     const encrypted = encryptSensitiveValue(
       content.slice(0, MAX_CAPTURED_ATTEMPT_CHARS)
     );
-    const recorded = await prisma.$transaction(async (tx) => {
+    const recorded = await databaseTransaction(async (tx) => {
       const violation = await tx.safetyViolation.create({
         data: {
           userId,
@@ -231,7 +231,7 @@ async function recordSafetyEvent(
     content.slice(0, MAX_CAPTURED_ATTEMPT_CHARS)
   );
   const now = new Date();
-  const recorded = await prisma.$transaction(async (tx) => {
+  const recorded = await databaseTransaction(async (tx) => {
     await tx.user.updateMany({
       where: { id: userId, learningLockedUntil: { lte: now } },
       data: { safetyStrikeCount: 0, learningLockedUntil: null },

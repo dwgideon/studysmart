@@ -3,14 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { decryptSensitiveValue } from "@/lib/sensitiveEncryption";
 
 const MAX_ATTEMPTS = 6;
-type DeliveryChannel = "EMAIL" | "SMS" | "PUSH";
+type DeliveryChannel = "EMAIL" | "SMS" | "PUSH" | "MOBILE_PUSH";
 
 type DeliveryResult = {
   providerId?: string;
 };
 
 function appUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "http://localhost:3000")
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "http://localhost:3000")
     .replace(/\/$/, "");
 }
 
@@ -121,10 +121,75 @@ async function sendPush(
   return { providerId: `web-push:${delivered}` };
 }
 
+async function sendMobilePush(
+  devices: Array<{ id: string; pushToken: string | null }>,
+  urgent: boolean,
+  reminder: boolean
+) {
+  const eligible = devices.filter((device): device is { id: string; pushToken: string } =>
+    Boolean(device.pushToken)
+  );
+  if (eligible.length === 0) {
+    throw new Error("No active mobile device can receive this alert.");
+  }
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (process.env.EXPO_ACCESS_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.EXPO_ACCESS_TOKEN}`;
+  }
+  const body = reminder
+    ? "A safety alert still needs acknowledgment. Open StudySmart to respond."
+    : urgent
+      ? "An urgent safety concern needs your attention. Open StudySmart to respond."
+      : "A connected learner safety alert needs your attention.";
+  const response = await fetch("https://exp.host/--/api/v2/push/send", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(eligible.map((device) => ({
+      to: device.pushToken,
+      title: urgent ? "Urgent StudySmart safety alert" : "StudySmart safety alert",
+      body,
+      sound: "default",
+      priority: urgent ? "high" : "default",
+      channelId: urgent ? "safety" : "learning",
+      data: { route: "/safety-alerts" },
+    }))),
+  });
+  const payload = await response.json().catch(() => ({})) as {
+    data?: Array<{ status?: string; id?: string; message?: string; details?: { error?: string } }>;
+    errors?: Array<{ message?: string }>;
+  };
+  if (!response.ok || !Array.isArray(payload.data)) {
+    throw new Error(payload.errors?.[0]?.message ?? `Mobile push provider returned ${response.status}.`);
+  }
+  let delivered = 0;
+  const ticketIds: string[] = [];
+  for (const [index, ticket] of payload.data.entries()) {
+    const device = eligible[index];
+    if (ticket.status === "ok") {
+      delivered += 1;
+      if (ticket.id) {ticketIds.push(ticket.id);}
+      continue;
+    }
+    if (ticket.details?.error === "DeviceNotRegistered") {
+      await prisma.mobileDevice.update({
+        where: { id: device.id },
+        data: { active: false, pushToken: null },
+      });
+      continue;
+    }
+    throw new Error(ticket.message ?? "Mobile push delivery failed.");
+  }
+  if (delivered === 0) {throw new Error("No mobile device accepted the safety alert.");}
+  return { providerId: ticketIds[0] ?? `expo-push:${delivered}` };
+}
+
 async function channelsForRecipient(recipientUserId: string) {
-  const [preference, pushCount] = await Promise.all([
+  const [preference, pushCount, mobileCount] = await Promise.all([
     prisma.safetyContactPreference.findUnique({ where: { userId: recipientUserId } }),
     prisma.pushSubscription.count({ where: { userId: recipientUserId, active: true } }),
+    prisma.mobileDevice.count({
+      where: { userId: recipientUserId, active: true, pushToken: { not: null } },
+    }),
   ]);
   const channels: DeliveryChannel[] = [];
   if (preference?.emailEnabled !== false) {channels.push("EMAIL");}
@@ -135,6 +200,7 @@ async function channelsForRecipient(recipientUserId: string) {
     preference.phoneAuthTag
   ) {channels.push("SMS");}
   if (preference?.pushEnabled && pushCount > 0) {channels.push("PUSH");}
+  if (preference?.pushEnabled && mobileCount > 0) {channels.push("MOBILE_PUSH");}
   return channels;
 }
 
@@ -209,9 +275,11 @@ async function deliver(
       phoneAuthTag: string | null;
     } | null;
     pushSubscriptions: Array<{ id: string; endpoint: string; p256dh: string; auth: string }>;
+    mobileDevices: Array<{ id: string; pushToken: string | null }>;
   },
   message: string,
-  urgent: boolean
+  urgent: boolean,
+  reminder: boolean
 ): Promise<DeliveryResult> {
   if (channel === "EMAIL") {return sendEmail(recipient.email, message, urgent);}
   if (channel === "SMS") {
@@ -227,6 +295,9 @@ async function deliver(
   }
   if (channel === "PUSH") {
     return sendPush(recipient.pushSubscriptions, message);
+  }
+  if (channel === "MOBILE_PUSH") {
+    return sendMobilePush(recipient.mobileDevices, urgent, reminder);
   }
   throw new Error(`Unsupported delivery channel: ${channel}`);
 }
@@ -253,6 +324,7 @@ export async function processSafetyDeliveries(limit = 100, violationId?: string)
             include: {
               safetyContactPreference: true,
               pushSubscriptions: { where: { active: true } },
+              mobileDevices: { where: { active: true, pushToken: { not: null } } },
             },
           },
           violation: { select: { category: true } },
@@ -269,7 +341,8 @@ export async function processSafetyDeliveries(limit = 100, violationId?: string)
         item.channel,
         item.notification.recipient,
         message,
-        urgent
+        urgent,
+        item.escalationLevel > 0
       );
       await prisma.safetyDelivery.update({
         where: { id: item.id },

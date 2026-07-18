@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { protectedAgeGroupForGrade } from "../src/lib/learningProfile.ts";
 import { isTrustedMutationRequest } from "../src/lib/requestSecurity.ts";
+import {
+  decryptSensitiveValue,
+  encryptSensitiveValue,
+} from "../src/lib/sensitiveEncryption.ts";
 
 test("grade and prior child status prevent age-protection bypasses", () => {
   assert.equal(protectedAgeGroupForGrade({ gradeLevel: "K", requestedAgeGroup: "ADULT" }), "UNDER_13");
@@ -25,5 +29,33 @@ test("cross-site browser mutations are rejected without blocking server clients"
   assert.equal(isTrustedMutationRequest({ method: "POST", headers: { ...base, "sec-fetch-site": "cross-site" } }), false);
   assert.equal(isTrustedMutationRequest({ method: "POST", headers: { ...base, origin: "https://studysmart.example" } }), true);
   assert.equal(isTrustedMutationRequest({ method: "POST", headers: { ...base, origin: "https://attacker.example" } }), false);
+  assert.equal(isTrustedMutationRequest({
+    method: "POST",
+    headers: {
+      ...base,
+      origin: "https://attacker.example",
+      "x-forwarded-host": "attacker.example",
+      "x-forwarded-proto": "https",
+    },
+  }), false);
   assert.equal(isTrustedMutationRequest({ method: "POST", headers: base }), true);
+});
+
+test("sensitive AES-GCM records require a full 128-bit authentication tag", () => {
+  const previous = process.env.SAFETY_ENCRYPTION_KEY;
+  process.env.SAFETY_ENCRYPTION_KEY = "unit-test-safety-encryption-key";
+  try {
+    const encrypted = encryptSensitiveValue("exact safety notification content");
+    assert.equal(decryptSensitiveValue(encrypted), "exact safety notification content");
+    const fullTag = Buffer.from(encrypted.authTag, "base64");
+    for (const length of [12, 8, 4]) {
+      assert.throws(() => decryptSensitiveValue({
+        ...encrypted,
+        authTag: fullTag.subarray(0, length).toString("base64"),
+      }), /Invalid encrypted/);
+    }
+  } finally {
+    if (previous === undefined) {delete process.env.SAFETY_ENCRYPTION_KEY;}
+    else {process.env.SAFETY_ENCRYPTION_KEY = previous;}
+  }
 });

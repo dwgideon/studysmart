@@ -10,7 +10,9 @@ type RetentionSummary = {
   experimentEventsDeleted: number;
   safetyDetailsPurged: number;
   stalePushSubscriptionsDisabled: number;
+  expiredMultiplayerRoomsDeleted: number;
   expiredOperationalRecordsDeleted: number;
+  expiredAiUsageRecordsDeleted: number;
 };
 
 export async function enforceDataRetention(now = new Date()) {
@@ -23,7 +25,9 @@ export async function enforceDataRetention(now = new Date()) {
     experimentEventsDeleted: 0,
     safetyDetailsPurged: 0,
     stalePushSubscriptionsDisabled: 0,
+    expiredMultiplayerRoomsDeleted: 0,
     expiredOperationalRecordsDeleted: 0,
+    expiredAiUsageRecordsDeleted: 0,
   };
   try {
     const settings = await prisma.privacySettings.findMany({
@@ -76,7 +80,8 @@ export async function enforceDataRetention(now = new Date()) {
     });
     summary.safetyDetailsPurged = safety.count;
 
-    const [push, launchStates, buckets] = await prisma.$transaction([
+    const operationalCutoff = new Date(now.getTime() - 400 * DAY_MS);
+    const [push, multiplayerRooms, launchStates, buckets, aiUsageEvents, aiUsageMonths, billingEvents] = await prisma.$transaction([
       prisma.pushSubscription.updateMany({
         where: {
           active: true,
@@ -84,13 +89,21 @@ export async function enforceDataRetention(now = new Date()) {
         },
         data: { active: false },
       }),
+      prisma.multiplayerRoom.deleteMany({
+        where: { expiresAt: { lt: new Date(now.getTime() - 7 * DAY_MS) } },
+      }),
       prisma.ltiLaunchState.deleteMany({
         where: { expiresAt: { lt: new Date(now.getTime() - 7 * DAY_MS) } },
       }),
       prisma.rateLimitBucket.deleteMany({ where: { resetAt: { lt: now } } }),
+      prisma.aiUsageEvent.deleteMany({ where: { createdAt: { lt: operationalCutoff } } }),
+      prisma.aiUsageMonth.deleteMany({ where: { month: { lt: operationalCutoff } } }),
+      prisma.billingWebhookEvent.deleteMany({ where: { createdAt: { lt: operationalCutoff } } }),
     ]);
     summary.stalePushSubscriptionsDisabled = push.count;
+    summary.expiredMultiplayerRoomsDeleted = multiplayerRooms.count;
     summary.expiredOperationalRecordsDeleted = launchStates.count + buckets.count;
+    summary.expiredAiUsageRecordsDeleted = aiUsageEvents.count + aiUsageMonths.count + billingEvents.count;
 
     await prisma.dataRetentionRun.update({
       where: { id: run.id },

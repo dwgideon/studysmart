@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withApiMonitoring } from "@/lib/apiMonitoring";
 import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { databaseTransaction, prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
 import { GameMode, rewardForQuestion, levelForXp } from "@/lib/gameEconomy";
 
@@ -60,7 +60,7 @@ async function startRun(userId: string, mode: GameMode, project?: string) {
 }
 
 async function answerQuestion(userId: string, runId: string, questionIndex: number, selectedIndex: number) {
-  return prisma.$transaction(async (tx) => {
+  return databaseTransaction(async (tx) => {
     const run = await tx.gameRun.findFirst({ where: { id: runId, userId } });
     if (!run || run.completedAt) {throw new Error("RUN_CLOSED");}
     const questions = run.questions as unknown as StoredQuestion[];

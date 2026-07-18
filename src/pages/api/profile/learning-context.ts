@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { prisma } from "@/lib/prisma";
+import { databaseTransaction, prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
 import {
   cleanText,
@@ -103,7 +103,7 @@ export default async function handler(
     }
   }
 
-  const [, course] = await prisma.$transaction(async (tx) => {
+  const [, course] = await databaseTransaction(async (tx) => {
     await tx.user.update({
       where: { id: user.id },
       data: { ageGroup: protectedAgeGroup },

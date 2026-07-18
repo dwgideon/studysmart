@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withApiMonitoring } from "@/lib/apiMonitoring";
 import { createHash } from "crypto";
-import { prisma } from "@/lib/prisma";
+import { databaseTransaction, prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
 import { cleanText } from "@/lib/learningProfile";
 import { getDistrictRestrictions } from "@/lib/districtPolicy";
@@ -156,7 +156,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       : null;
     const domainVerified = Boolean(verifiedOrganization);
     const status = domainVerified ? "DOMAIN_VERIFIED" : "PENDING_REVIEW";
-    const verification = await prisma.$transaction(async (tx) => {
+    const verification = await databaseTransaction(async (tx) => {
       const created = await tx.roleVerification.create({
         data: {
           userId: user.id,

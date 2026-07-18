@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { prisma } from "@/lib/prisma";
+import { databaseTransaction } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
 import { catalogItem, STARTER_ITEMS } from "@/lib/gameEconomy";
 
@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!item) {return res.status(404).json({ error: "That avatar item is unavailable." });}
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await databaseTransaction(async (tx) => {
       const profile = await tx.gameProfile.upsert({ where: { userId: user.id }, create: { userId: user.id }, update: {} });
       const isStarter = STARTER_ITEMS.includes(item.id);
       const ownership = isStarter ? true : Boolean(await tx.avatarItemOwnership.findUnique({ where: { userId_itemId: { userId: user.id, itemId: item.id } } }));

@@ -14,6 +14,8 @@ import {
 import { retrieveSourceChunks } from "@/lib/sourceIngestion";
 import { recordAiTrace } from "@/lib/aiObservability";
 import { isAiFreeTestMode, localGroundedTutorReply } from "@/lib/aiFreeTestMode";
+import { AiCreditLimitError, aiCreditErrorResponse, withAiCredits } from "@/lib/aiCredits";
+import { AI_CREDIT_COSTS } from "@/lib/plans";
 
 const TUTOR_MODEL = "gpt-4o-mini";
 const TUTOR_PROMPT_VERSION = "k12-grounded-v3";
@@ -181,18 +183,21 @@ async function handler(
     const modelStartedAt = Date.now();
     const generatedReply = isAiFreeTestMode
       ? localGroundedTutorReply({ question: latestUserMessage.content, sourceMode, chunks: groundedChunks })
-      : (await openai.chat.completions.create({
-          model: TUTOR_MODEL,
-          temperature: 0.4,
-          max_tokens: 500,
-          messages: [
-            {
-              role: "system",
-              content: `${K12_SAFETY_PROMPT}\n\n${tutorPromptForGrade(learnerProfile?.gradeLevel ?? "6")}\n\nUse questions and hints before giving a complete answer when that supports learning. Never shame mistakes.\n\n${sourceInstruction}`,
-            },
-            ...messages,
-          ],
-        })).choices[0].message.content ?? "I could not form a response.";
+      : await withAiCredits(
+          { userId: user.id, feature: "TUTOR", model: TUTOR_MODEL, credits: AI_CREDIT_COSTS.tutorReply },
+          async () => (await openai.chat.completions.create({
+            model: TUTOR_MODEL,
+            temperature: 0.4,
+            max_tokens: 500,
+            messages: [
+              {
+                role: "system",
+                content: `${K12_SAFETY_PROMPT}\n\n${tutorPromptForGrade(learnerProfile?.gradeLevel ?? "6")}\n\nUse questions and hints before giving a complete answer when that supports learning. Never shame mistakes.\n\n${sourceInstruction}`,
+              },
+              ...messages,
+            ],
+          })).choices[0].message.content ?? "I could not form a response."
+        );
     const outputSafety = await moderateK12Content(
       user.id,
       generatedReply,
@@ -268,6 +273,10 @@ async function handler(
       concept: matchedConcept ? { id: matchedConcept.id, name: matchedConcept.name } : null,
     });
   } catch (error) {
+    if (error instanceof AiCreditLimitError) {
+      const response = aiCreditErrorResponse(error);
+      return res.status(402).json({ ...response, reply: response.error });
+    }
     console.error("Tutor error:", error);
     return res.status(500).json({ reply: isAiFreeTestMode ? "The local test tutor could not respond." : "AI tutor failed to respond." });
   }

@@ -1,15 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { withApiMonitoring } from "@/lib/apiMonitoring";
+import { Prisma } from "@prisma/client";
 import type { Readable } from "stream";
-import Stripe from "stripe";
-import { stripe } from "../../../lib/stripe";
-import { supabaseAdmin } from "../../../lib/supabaseAdmin";
+import type Stripe from "stripe";
+import { withApiMonitoring } from "@/lib/apiMonitoring";
+import { isPaidPlanKey, planKeyForPriceId } from "@/lib/plans";
+import { prisma } from "@/lib/prisma";
+import { stripe } from "@/lib/stripe";
 
-export const config = {
-  api: { bodyParser: false },
-};
+export const config = { api: { bodyParser: false } };
 
-// Helper to read raw body
 function buffer(readable: Readable): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -19,130 +18,159 @@ function buffer(readable: Readable): Promise<Buffer> {
   });
 }
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Unknown error";
+function periodEnd(subscription: Stripe.Subscription) {
+  const value = (subscription as unknown as { current_period_end?: unknown }).current_period_end;
+  return typeof value === "number" ? new Date(value * 1000) : null;
 }
 
-function subscriptionPeriodEnd(subscription: Stripe.Subscription) {
-  const value = (
-    subscription as unknown as { current_period_end?: unknown }
-  ).current_period_end;
-  return typeof value === "number" ? value : null;
+function metadataId(value: string | undefined) {
+  return value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value
+    : null;
 }
 
-async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
+async function syncSubscription(
+  subscription: Stripe.Subscription,
+  fallback?: { payerUserId?: string | null; beneficiaryUserId?: string | null; plan?: string | null }
 ) {
-  if (req.method !== "POST") {return res.status(405).end("Method not allowed");}
-
-  const sig = req.headers["stripe-signature"] as string | undefined;
-  if (!sig) {return res.status(400).send("Missing Stripe signature");}
-
-  const buf = await buffer(req);
-
-  let event: Stripe.Event;
-
-  try {
-    event = stripe.webhooks.constructEvent(
-      buf,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET as string
-    );
-  } catch (err: unknown) {
-    const message = errorMessage(err);
-    console.error("Webhook signature verification failed:", message);
-    return res.status(400).send(`Webhook Error: ${message}`);
+  const priceId = subscription.items.data[0]?.price.id;
+  const payerUserId = metadataId(subscription.metadata.app_user_id) ?? fallback?.payerUserId ?? null;
+  const beneficiaryUserId = metadataId(subscription.metadata.beneficiary_user_id)
+    ?? fallback?.beneficiaryUserId
+    ?? payerUserId;
+  const metadataPlan = subscription.metadata.plan_key || fallback?.plan || null;
+  const plan = planKeyForPriceId(priceId) ?? (isPaidPlanKey(metadataPlan) ? metadataPlan : null);
+  const customerId = typeof subscription.customer === "string"
+    ? subscription.customer
+    : subscription.customer.id;
+  if (!priceId || !payerUserId || !beneficiaryUserId || !plan) {
+    throw new Error("Subscription metadata is incomplete.");
   }
+  const users = await prisma.user.count({
+    where: { id: { in: [...new Set([payerUserId, beneficiaryUserId])] } },
+  });
+  if (users !== new Set([payerUserId, beneficiaryUserId]).size) {
+    throw new Error("Subscription references an unknown account.");
+  }
+  await prisma.billingSubscription.upsert({
+    where: { id: subscription.id },
+    create: {
+      id: subscription.id,
+      payerUserId,
+      beneficiaryUserId,
+      stripeCustomerId: customerId,
+      priceId,
+      plan,
+      status: subscription.status,
+      currentPeriodEnd: periodEnd(subscription),
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    },
+    update: {
+      payerUserId,
+      beneficiaryUserId,
+      stripeCustomerId: customerId,
+      priceId,
+      plan,
+      status: subscription.status,
+      currentPeriodEnd: periodEnd(subscription),
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    },
+  });
+  const active = await prisma.billingSubscription.findFirst({
+    where: {
+      beneficiaryUserId,
+      status: { in: ["active", "trialing"] },
+      OR: [{ currentPeriodEnd: null }, { currentPeriodEnd: { gt: new Date() } }],
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { plan: true },
+  });
+  await prisma.user.update({
+    where: { id: beneficiaryUserId },
+    data: { plan: active?.plan ?? null },
+  });
+}
 
+async function processEvent(event: Stripe.Event) {
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const subscriptionId = typeof session.subscription === "string"
+      ? session.subscription
+      : session.subscription?.id;
+    if (!subscriptionId) {return;}
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    await syncSubscription(subscription, {
+      payerUserId: metadataId(session.metadata?.app_user_id),
+      beneficiaryUserId: metadataId(session.metadata?.beneficiary_user_id),
+      plan: session.metadata?.plan_key ?? null,
+    });
+    return;
+  }
+  if (
+    event.type === "customer.subscription.created" ||
+    event.type === "customer.subscription.updated" ||
+    event.type === "customer.subscription.deleted"
+  ) {
+    await syncSubscription(event.data.object as Stripe.Subscription);
+  }
+}
+
+async function claimEvent(event: Stripe.Event) {
   try {
-    switch (event.type) {
-      case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
-
-        const fullSession =
-          session.line_items
-            ? session
-            : await stripe.checkout.sessions.retrieve(session.id, {
-                expand: ["line_items"],
-              });
-
-        const appUserId = session.metadata?.app_user_id || null;
-        const stripeCustomerId = session.customer as string | null;
-        const customerEmail =
-          session.customer_details?.email ||
-          session.customer_email ||
-          null;
-
-        const purchasedPriceId =
-          fullSession?.line_items?.data?.[0]?.price?.id || null;
-
-        const subscriptionId = session.subscription as string | null;
-
-        let status = "active";
-        let current_period_end: string | null = null;
-
-        if (subscriptionId) {
-          const sub = await stripe.subscriptions.retrieve(subscriptionId);
-          const periodEnd = subscriptionPeriodEnd(sub);
-
-          status = sub.status || "active";
-          current_period_end = periodEnd
-            ? new Date(periodEnd * 1000).toISOString()
-            : null;
-        }
-
-        await supabaseAdmin.from("profiles").upsert(
-          {
-            id: appUserId,
-            email: customerEmail,
-            stripe_customer_id: stripeCustomerId,
-            subscription_price_id: purchasedPriceId,
-            subscription_status: status,
-            current_period_end,
-          },
-          { onConflict: "id" }
-        );
-
-        break;
-      }
-
-      case "customer.subscription.updated":
-      case "customer.subscription.deleted": {
-        const sub = event.data.object as Stripe.Subscription;
-        const stripeCustomerId =
-          typeof sub.customer === "string" ? sub.customer : sub.customer.id;
-        const purchasedPriceId =
-          sub.items?.data?.[0]?.price?.id || null;
-
-        const status = sub.status;
-
-        const periodEnd = subscriptionPeriodEnd(sub);
-        const current_period_end = periodEnd
-          ? new Date(periodEnd * 1000).toISOString()
-          : null;
-
-        await supabaseAdmin
-          .from("profiles")
-          .update({
-            subscription_status: status,
-            subscription_price_id: purchasedPriceId,
-            current_period_end,
-          })
-          .eq("stripe_customer_id", stripeCustomerId);
-
-        break;
-      }
-
-      default:
-        // Ignore other events
-        break;
+    await prisma.billingWebhookEvent.create({
+      data: { id: event.id, type: event.type, processingAt: new Date() },
+    });
+    return true;
+  } catch (error) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+      throw error;
     }
+    const stale = new Date(Date.now() - 10 * 60_000);
+    const claimed = await prisma.billingWebhookEvent.updateMany({
+      where: {
+        id: event.id,
+        processedAt: null,
+        OR: [{ processingAt: null }, { processingAt: { lt: stale } }],
+      },
+      data: { processingAt: new Date(), failedAt: null },
+    });
+    return claimed.count === 1;
+  }
+}
 
-    res.json({ received: true });
-  } catch (err) {
-    console.error("Webhook handler error:", err);
-    res.status(500).end();
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).end("Method not allowed");
+  }
+  const signature = Array.isArray(req.headers["stripe-signature"])
+    ? req.headers["stripe-signature"][0]
+    : req.headers["stripe-signature"];
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!signature) {return res.status(400).send("Missing Stripe signature");}
+  if (!secret) {return res.status(503).send("Stripe webhook is not configured");}
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(await buffer(req), signature, secret);
+  } catch {
+    return res.status(400).send("Webhook signature verification failed");
+  }
+  try {
+    const claimed = await claimEvent(event);
+    if (!claimed) {return res.status(200).json({ received: true, duplicate: true });}
+    await processEvent(event);
+    await prisma.billingWebhookEvent.update({
+      where: { id: event.id },
+      data: { processedAt: new Date(), processingAt: null, failedAt: null },
+    });
+    return res.status(200).json({ received: true });
+  } catch (error) {
+    await prisma.billingWebhookEvent.updateMany({
+      where: { id: event.id },
+      data: { failedAt: new Date(), processingAt: null },
+    });
+    console.error("Stripe webhook processing failed:", error instanceof Error ? error.message : "unknown");
+    return res.status(500).end();
   }
 }
 

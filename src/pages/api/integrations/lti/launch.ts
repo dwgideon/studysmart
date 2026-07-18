@@ -1,8 +1,8 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, customFetch, jwtVerify } from "jose";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { Prisma } from "@prisma/client";
-import { hashLtiValue, LTI_CLAIMS, safeExternalHttpsUrl } from "@/lib/interoperability/lti";
-import { prisma } from "@/lib/prisma";
+import { hashLtiValue, LTI_CLAIMS, safeExternalHttpsUrl, safeLtiFetch } from "@/lib/interoperability/lti";
+import { databaseTransaction, prisma } from "@/lib/prisma";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {return res.status(405).end();}
@@ -17,7 +17,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "LTI launch state is invalid or expired." });
   }
   try {
-    const jwks = createRemoteJWKSet(safeExternalHttpsUrl(launchState.deployment.jwksUrl));
+    const jwks = createRemoteJWKSet(safeExternalHttpsUrl(launchState.deployment.jwksUrl), {
+      [customFetch]: safeLtiFetch,
+    });
     const verified = await jwtVerify(idToken, jwks, {
       issuer: launchState.deployment.issuer,
       audience: launchState.deployment.clientId,
@@ -38,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const context = claims[LTI_CLAIMS.context] as { id?: unknown; title?: unknown } | undefined;
     const resource = claims[LTI_CLAIMS.resourceLink] as { id?: unknown; title?: unknown } | undefined;
     const subjectHash = hashLtiValue(`${launchState.deployment.issuer}|${claims.sub ?? ""}`);
-    const launch = await prisma.$transaction(async (tx) => {
+    const launch = await databaseTransaction(async (tx) => {
       await tx.ltiLaunchState.update({ where: { id: launchState.id }, data: { usedAt: new Date() } });
       return tx.ltiLaunch.create({
         data: {
