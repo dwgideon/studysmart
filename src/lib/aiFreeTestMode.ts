@@ -1,4 +1,5 @@
 export const isAiFreeTestMode = process.env.AI_FREE_TEST_MODE === "true";
+export const MAX_STUDY_ITEMS = 100;
 
 export const AI_FREE_SAMPLE_LESSON = `Water Cycle Test Lesson
 Evaporation happens when liquid water warms and changes into water vapor.
@@ -27,11 +28,14 @@ function conceptFrom(sentence: string) {
   return words.slice(0, 3).join(" ") || "Core ideas";
 }
 
-export function generateLocalFlashcards(text: string, count = 8): LocalFlashcard[] {
+export function generateLocalFlashcards(text: string, count?: number): LocalFlashcard[] {
   const input = cleanLines(text);
   const fallback = cleanLines(AI_FREE_SAMPLE_LESSON);
   const facts = input.length >= 3 ? input : [...input, ...fallback];
-  const uniqueFacts = [...new Set(facts)].slice(0, Math.max(3, Math.min(20, count)));
+  const uniqueFacts = [...new Set(facts)];
+  const target = count === undefined
+    ? uniqueFacts.length
+    : Math.max(3, Math.min(MAX_STUDY_ITEMS, count));
   return uniqueFacts.map((fact, index) => {
     const direct = fact.match(/^(.{3,90}?):\s+(.{3,})$/);
     if (direct) {return { front: direct[1].trim(), back: direct[2].trim(), concept: conceptFrom(direct[1]) };}
@@ -41,7 +45,7 @@ export function generateLocalFlashcards(text: string, count = 8): LocalFlashcard
       back: fact,
       concept,
     };
-  });
+  }).slice(0, target);
 }
 
 type LocalQuizQuestion = {
@@ -52,10 +56,13 @@ type LocalQuizQuestion = {
   concept: string;
 };
 
-export function generateLocalQuiz(text: string, count = 6): LocalQuizQuestion[] {
-  const cards = generateLocalFlashcards(text, Math.max(6, count));
+export function generateLocalQuiz(text: string, count?: number): LocalQuizQuestion[] {
+  const cards = generateLocalFlashcards(text, count);
   const letters = ["A", "B", "C", "D"] as const;
-  return cards.slice(0, Math.max(3, Math.min(20, count))).map((card, index) => {
+  const target = count === undefined
+    ? cards.length
+    : Math.max(3, Math.min(MAX_STUDY_ITEMS, count));
+  return cards.slice(0, target).map((card, index) => {
     const correctLetter = letters[index % letters.length];
     const alternatives = cards
       .filter((candidate) => candidate.back !== card.back)

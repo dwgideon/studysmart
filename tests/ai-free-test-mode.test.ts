@@ -15,6 +15,16 @@ test("AI-free flashcards are deterministic and usable by games", () => {
   assert.ok(first.every((card) => card.front && card.back && card.concept));
 });
 
+test("AI-free mode scales to the material instead of stopping at eight cards", () => {
+  const deepMaterial = Array.from({ length: 24 }, (_, index) =>
+    `Concept ${index + 1} is an important study fact with a distinct definition and example.`
+  ).join("\n");
+  const cards = generateLocalFlashcards(deepMaterial);
+  const questions = generateLocalQuiz(deepMaterial);
+  assert.equal(cards.length, 24);
+  assert.equal(questions.length, 24);
+});
+
 test("AI-free quiz questions contain one correctly keyed answer", () => {
   const questions = generateLocalQuiz(AI_FREE_SAMPLE_LESSON, 6);
   assert.equal(questions.length, 6);

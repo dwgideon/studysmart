@@ -9,14 +9,6 @@ import { generateLocalQuiz, isAiFreeTestMode } from "@/lib/aiFreeTestMode";
 import { AiCreditLimitError, aiCreditErrorResponse, withAiCredits } from "@/lib/aiCredits";
 import { AI_CREDIT_COSTS } from "@/lib/plans";
 
-function calculateQuestionCount(text: string) {
-  const wordCount = text.split(/\s+/).length;
-  let count = Math.round(wordCount / 80);
-  if (count < 5) {count = 5;}
-  if (count > 25) {count = 25;}
-  return count;
-}
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -45,31 +37,29 @@ export default async function handler(
       });
     }
 
-    const questionCount = calculateQuestionCount(content);
-
     let questions: unknown[];
     if (isAiFreeTestMode) {
-      questions = generateLocalQuiz(content, questionCount);
+      questions = generateLocalQuiz(content);
     } else {
       const completion = await withAiCredits(
         { userId: user.id, feature: "QUIZ_BUILDER", model: "gpt-4o-mini", credits: AI_CREDIT_COSTS.quiz },
         () => openai.chat.completions.create({
           model: "gpt-4o-mini",
           temperature: 0.4,
-          max_tokens: 1500,
+          max_tokens: 12000,
           messages: [
             {
               role: "system",
-              content: `${K12_SAFETY_PROMPT}\n\nCreate exactly ${questionCount} multiple-choice questions for a grade ${profile?.gradeLevel ?? "6"} student. Match vocabulary and challenge to that age. JSON only: {"questions":[{"question":"","options":{"A":"","B":"","C":"","D":""},"answer":"A","explanation":"","concept":"short reusable topic label"}]}`,
+              content: `${K12_SAFETY_PROMPT}\n\nFirst determine how many multiple-choice questions this material needs for effective learning and retrieval practice. Use one question per distinct, testable learning objective or important relationship. Short material may need 5–10 questions; broad material may need dozens or up to 100. Do not default to a fixed count, and avoid redundant questions. Create age-appropriate questions for a grade ${profile?.gradeLevel ?? "6"} student. JSON only: {"questions":[{"question":"","options":{"A":"","B":"","C":"","D":""},"answer":"A","explanation":"","concept":"short reusable topic label"}]}`,
             },
-            { role: "user", content: content.slice(0, 12_000) },
+            { role: "user", content: content.slice(0, 100_000) },
           ],
         })
       );
       const raw = completion.choices[0].message?.content;
       const outputSafety = await moderateK12Content(user.id, raw ?? "", "QUIZ_BUILDER_OUTPUT");
       if (!outputSafety.allowed) {return res.status(422).json({ error: "The generated quiz did not pass the K–12 safety check." });}
-      questions = parseAiJson<{ questions: unknown[] }>(raw)?.questions ?? [];
+      questions = (parseAiJson<{ questions: unknown[] }>(raw)?.questions ?? []).slice(0, 100);
     }
 
     if (!questions.length) {

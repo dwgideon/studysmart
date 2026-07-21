@@ -37,34 +37,29 @@ export default async function handler(
       });
     }
 
-    const wordCount = lesson.split(/\s+/).length;
-    let questionCount = Math.round(wordCount / 80);
-    if (questionCount < 5) {questionCount = 5;}
-    if (questionCount > 20) {questionCount = 20;}
-
     let questions: unknown[];
     if (isAiFreeTestMode) {
-      questions = generateLocalQuiz(lesson, questionCount);
+      questions = generateLocalQuiz(lesson);
     } else {
       const completion = await withAiCredits(
         { userId: user.id, feature: "QUIZ", model: "gpt-4o-mini", credits: AI_CREDIT_COSTS.quiz },
         () => openai.chat.completions.create({
           model: "gpt-4o-mini",
           temperature: 0.4,
-          max_tokens: 1500,
+          max_tokens: 12000,
           messages: [
             {
               role: "system",
-              content: `${K12_SAFETY_PROMPT}\n\nCreate a ${questionCount}-question multiple-choice quiz for a grade ${profile?.gradeLevel ?? "6"} student. Use age-appropriate vocabulary and challenge. Each question must contain: question, options A-D, answer letter, explanation, and a short reusable concept label. Respond ONLY with JSON: {"questions":[...]}`,
+              content: `${K12_SAFETY_PROMPT}\n\nFirst determine how many multiple-choice questions this lesson needs for effective learning and retrieval practice. Use one question per distinct, testable learning objective or important relationship. Short material may need 5–10 questions; broad material may need dozens or up to 100. Do not default to a fixed count, and avoid redundant questions. Use age-appropriate vocabulary and challenge for a grade ${profile?.gradeLevel ?? "6"} student. Each question must contain: question, options A-D, answer letter, explanation, and a short reusable concept label. Respond ONLY with JSON: {"questions":[...]}`,
             },
-            { role: "user", content: lesson.slice(0, 12_000) },
+            { role: "user", content: lesson.slice(0, 100_000) },
           ],
         })
       );
       const raw = completion.choices[0].message?.content;
       const outputSafety = await moderateK12Content(user.id, raw ?? "", "QUIZ_OUTPUT");
       if (!outputSafety.allowed) {return res.status(422).json({ error: "The generated quiz did not pass the K–12 safety check." });}
-      questions = parseAiJson<{ questions: unknown[] }>(raw)?.questions ?? [];
+      questions = (parseAiJson<{ questions: unknown[] }>(raw)?.questions ?? []).slice(0, 100);
     }
 
     if (!questions.length) {

@@ -2,7 +2,7 @@
 import { openai } from "./openai";
 import { parseAiJson } from "./parseAiJson";
 import { K12_SAFETY_PROMPT, moderateK12Content } from "./childSafety";
-import { generateLocalFlashcards, isAiFreeTestMode } from "./aiFreeTestMode";
+import { generateLocalFlashcards, isAiFreeTestMode, MAX_STUDY_ITEMS } from "./aiFreeTestMode";
 
 type GeneratedFlashcard = {
   front: string;
@@ -25,10 +25,12 @@ export async function generateFlashcardsFromText(
   userId: string
 ): Promise<GeneratedFlashcard[]> {
   if (isAiFreeTestMode) {
-    return generateLocalFlashcards(text, 8);
+    return generateLocalFlashcards(text);
   }
   const instructions = `${K12_SAFETY_PROMPT}\n\nYou are a flashcard generator for K–12 students.
-- Generate 5 concise flashcards from the provided content.
+- First determine how many flashcards are needed to help a learner memorize the provided material.
+- Use one card for each distinct, testable learning objective or important relationship. Short material may need 5–10 cards; broad material may need dozens or up to 100.
+- Do not default to a fixed number. Cover the material completely without creating redundant cards.
 - Format the result as an array of JSON objects.
 - Each object MUST have a "front" (question), "back" (answer), and "concept".
 - "concept" must be a short, reusable topic label such as "Cellular respiration" or "Linear equations".
@@ -38,9 +40,10 @@ export async function generateFlashcardsFromText(
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
+    max_tokens: 12000,
     messages: [
       { role: "system", content: instructions },
-      { role: "user", content: text.slice(0, 12_000) },
+      { role: "user", content: text.slice(0, 100_000) },
     ],
   });
 
@@ -71,5 +74,5 @@ export async function generateFlashcardsFromText(
       return { front, back, concept: concept.slice(0, 120) || "Core ideas" };
     })
     .filter((card): card is GeneratedFlashcard => card !== null)
-    .slice(0, 20);
+    .slice(0, MAX_STUDY_ITEMS);
 }
