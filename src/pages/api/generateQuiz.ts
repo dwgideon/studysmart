@@ -8,6 +8,7 @@ import { aiAccessForUser, K12_SAFETY_PROMPT, moderateK12Content } from "@/lib/ch
 import { generateLocalQuiz, isAiFreeTestMode } from "@/lib/aiFreeTestMode";
 import { AiCreditLimitError, aiCreditErrorResponse, withAiCredits } from "@/lib/aiCredits";
 import { AI_CREDIT_COSTS } from "@/lib/plans";
+import { shuffleQuizQuestions } from "@/lib/quizQuality";
 
 export default async function handler(
   req: NextApiRequest,
@@ -39,7 +40,7 @@ export default async function handler(
 
     let questions: unknown[];
     if (isAiFreeTestMode) {
-      questions = generateLocalQuiz(content);
+      questions = shuffleQuizQuestions(generateLocalQuiz(content));
     } else {
       const completion = await withAiCredits(
         { userId: user.id, feature: "QUIZ_BUILDER", model: "gpt-4o-mini", credits: AI_CREDIT_COSTS.quiz },
@@ -50,7 +51,7 @@ export default async function handler(
           messages: [
             {
               role: "system",
-              content: `${K12_SAFETY_PROMPT}\n\nFirst determine how many multiple-choice questions this material needs for effective learning and retrieval practice. Use one question per distinct, testable learning objective or important relationship. Short material may need 5–10 questions; broad material may need dozens or up to 100. Do not default to a fixed count, and avoid redundant questions. Create age-appropriate questions for a grade ${profile?.gradeLevel ?? "6"} student. JSON only: {"questions":[{"question":"","options":{"A":"","B":"","C":"","D":""},"answer":"A","explanation":"","concept":"short reusable topic label"}]}`,
+              content: `${K12_SAFETY_PROMPT}\n\nFirst determine how many multiple-choice questions this material needs for effective learning and retrieval practice. Use one question per distinct, testable learning objective or important relationship. Short material may need 5–10 questions; broad material may need dozens or up to 100. Do not default to a fixed count, and avoid redundant questions. Create age-appropriate questions for a grade ${profile?.gradeLevel ?? "6"} student. Every question must have exactly four total options, with exactly one correct answer. Make all options answer the same kind of question and stay within the same concept. Distractors should reflect realistic K–12 misconceptions or nearby alternatives, never unrelated facts copied from another section. Keep options similar in grammatical form and approximate length, avoid clues such as the longest or most detailed option, and do not repeat wording from the question that gives away the answer. Silently check each item for a single best answer before returning. JSON only: {"questions":[{"question":"","options":{"A":"","B":"","C":"","D":""},"answer":"A","explanation":"","concept":"short reusable topic label"}]}`,
             },
             { role: "user", content: content.slice(0, 100_000) },
           ],
@@ -59,7 +60,7 @@ export default async function handler(
       const raw = completion.choices[0].message?.content;
       const outputSafety = await moderateK12Content(user.id, raw ?? "", "QUIZ_BUILDER_OUTPUT");
       if (!outputSafety.allowed) {return res.status(422).json({ error: "The generated quiz did not pass the K–12 safety check." });}
-      questions = (parseAiJson<{ questions: unknown[] }>(raw)?.questions ?? []).slice(0, 100);
+      questions = shuffleQuizQuestions((parseAiJson<{ questions: unknown[] }>(raw)?.questions ?? []).slice(0, 100));
     }
 
     if (!questions.length) {
