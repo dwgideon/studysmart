@@ -2,6 +2,35 @@ type QuizOptionLetter = "A" | "B" | "C" | "D";
 
 const OPTION_LETTERS: QuizOptionLetter[] = ["A", "B", "C", "D"];
 
+function normalized(value: string) {
+  return value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/** Reject malformed model output before it reaches the learner-facing quiz. */
+export function isUsableQuizQuestion(question: unknown): boolean {
+  if (!question || typeof question !== "object" || Array.isArray(question)) {
+    return false;
+  }
+  const record = question as Record<string, unknown>;
+  if (typeof record.question !== "string" || record.question.trim().length < 8) {
+    return false;
+  }
+  if (!record.options || typeof record.options !== "object" || Array.isArray(record.options)) {
+    return false;
+  }
+  const optionRecord = record.options as Record<string, unknown>;
+  const values = OPTION_LETTERS.map((letter) => optionRecord[letter]);
+  if (values.some((value) => typeof value !== "string" || value.trim().length === 0 || value.length > 1200)) {
+    return false;
+  }
+  const uniqueValues = new Set(values.map((value) => normalized(value as string)));
+  if (uniqueValues.size !== OPTION_LETTERS.length) {
+    return false;
+  }
+  const answer = typeof record.answer === "string" ? record.answer.trim().toUpperCase() : "";
+  return OPTION_LETTERS.includes(answer as QuizOptionLetter);
+}
+
 /** Randomize answer positions so learners cannot exploit a fixed answer pattern. */
 export function shuffleQuizOptions(question: unknown): unknown {
   if (!question || typeof question !== "object" || Array.isArray(question)) {
@@ -37,5 +66,5 @@ export function shuffleQuizOptions(question: unknown): unknown {
 }
 
 export function shuffleQuizQuestions(questions: unknown[]) {
-  return questions.map(shuffleQuizOptions);
+  return questions.filter(isUsableQuizQuestion).map(shuffleQuizOptions);
 }
