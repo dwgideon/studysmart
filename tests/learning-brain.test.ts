@@ -7,6 +7,7 @@ import {
   type MasterySnapshot,
 } from "../src/lib/mastery.ts";
 import { predictedRetention, scheduleNextReview } from "../src/lib/spacedRepetition.ts";
+import { buildMasteryInsight } from "../src/lib/masteryInsights.ts";
 
 const snapshot: MasterySnapshot = {
   score: 0.5,
@@ -79,4 +80,20 @@ test("memory scheduler gives failures a short retry and easy recalls more stabil
   assert.ok(failed.intervalDays < good.intervalDays);
   assert.ok(easy.memoryStability > good.memoryStability);
   assert.ok(predictedRetention(0, 2) > predictedRetention(10, 2));
+});
+
+test("mastery insight turns evidence into an explainable next action", () => {
+  const insight = buildMasteryInsight({
+    mastery: {
+      ...snapshot,
+      nextReviewAt: new Date("2026-07-13T00:00:00.000Z"),
+    },
+    prerequisiteGap: 0.8,
+  }, new Date("2026-07-14T00:00:00.000Z"));
+
+  assert.equal(insight.due, true);
+  assert.equal(insight.recommendedMode, "PREREQUISITE_REPAIR");
+  assert.ok(insight.priority > 0.4);
+  assert.ok(insight.predictedRetention >= 0 && insight.predictedRetention <= 1);
+  assert.ok(insight.score < snapshot.score);
 });

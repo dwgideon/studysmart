@@ -8,6 +8,7 @@ import { useK12Experience } from "@/components/K12Experience";
 type Attribution = {
   mode: "UPLOADED_MATERIAL" | "GENERAL_KNOWLEDGE";
   label: string;
+  citationStatus?: "CITED" | "MISSING" | "INVALID" | "NOT_APPLICABLE";
   citations: Array<{
     label: string;
     sourceChunkId: string;
@@ -45,7 +46,7 @@ function TutorChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const { gradeLevel, labels } = useK12Experience();
+  const { gradeLevel, labels, config } = useK12Experience();
   const [sourceMode, setSourceMode] = useState("materials");
   const [quiz, setQuiz] = useState<QuizQuestion[]>([]);
   const [showQuiz, setShowQuiz] = useState(false);
@@ -165,8 +166,15 @@ function TutorChat() {
 
         <div className={styles.tutorControls}>
           <div className={styles.gradeContext}>
-            <span>Automatically adapted</span>
-            <strong>{gradeLevel ? `Grade ${gradeLevel}` : "K–12 learning level"}</strong>
+              <span>Automatically adapted</span>
+              <strong>{config?.displayLabel ?? (gradeLevel ? `Grade ${gradeLevel}` : "K–12 learning level")}</strong>
+              {config && (
+                <small>
+                  {config.readAloud === "REQUIRED" ? "Words shown and read aloud" :
+                    config.readAloud === "PREFERRED" ? "Read-aloud support available" :
+                      "Reasoning-first explanations"}
+                </small>
+              )}
           </div>
           <label>
             Answer using

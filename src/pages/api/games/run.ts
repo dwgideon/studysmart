@@ -4,6 +4,8 @@ import { Prisma } from "@prisma/client";
 import { databaseTransaction, prisma } from "@/lib/prisma";
 import { requireApiUser } from "@/lib/auth";
 import { GameMode, rewardForQuestion, levelForXp } from "@/lib/gameEconomy";
+import { recordMasteryEvidence } from "@/lib/masteryService";
+import { scheduleNextReview } from "@/lib/spacedRepetition";
 
 type StoredQuestion = {
   cardId: string;
@@ -69,6 +71,22 @@ async function answerQuestion(userId: string, runId: string, questionIndex: numb
     if (!question || !Number.isInteger(selectedIndex) || !question.options[selectedIndex]) {throw new Error("BAD_ANSWER");}
     if (answers.some((answer) => answer.questionIndex === questionIndex)) {throw new Error("ALREADY_ANSWERED");}
 
+    const card = await tx.flashcard.findFirst({
+      where: { id: question.cardId, userId },
+      select: {
+        id: true,
+        conceptId: true,
+        intervalDays: true,
+        easeFactor: true,
+        scheduledReviewCount: true,
+        lapseCount: true,
+        memoryStability: true,
+        memoryDifficulty: true,
+        targetRetention: true,
+      },
+    });
+    if (!card) {throw new Error("CARD_NOT_FOUND");}
+
     const correct = question.correctIndex === selectedIndex;
     const reward = rewardForQuestion(correct, question.difficulty, run.rewardsEnabled);
     const nextAnswers = [...answers, { questionIndex, selectedIndex, correct }];
@@ -84,6 +102,48 @@ async function answerQuestion(userId: string, runId: string, questionIndex: numb
         completedAt: finished ? new Date() : undefined,
       },
     });
+
+    let mastery = null;
+    let masteryScore = 0;
+    if (card.conceptId) {
+      const recorded = await recordMasteryEvidence(tx, {
+        userId,
+        conceptId: card.conceptId,
+        sourceType: "GAME_ANSWER",
+        sourceId: run.id,
+        correct,
+        difficulty: Math.min(1, Math.max(0, question.difficulty / 3)),
+        independent: true,
+      });
+      masteryScore = recorded.score;
+      mastery = {
+        score: recorded.score,
+        confidence: recorded.confidence,
+        status: recorded.status,
+      };
+    }
+    const schedule = scheduleNextReview({
+      correct,
+      intervalDays: card.intervalDays,
+      easeFactor: card.easeFactor,
+      reviewCount: card.scheduledReviewCount,
+      lapseCount: card.lapseCount,
+      masteryScore,
+      rating: correct ? 3 : 1,
+      memoryStability: card.memoryStability,
+      memoryDifficulty: card.memoryDifficulty,
+      targetRetention: card.targetRetention,
+    });
+    await tx.cardReview.create({
+      data: {
+        userId,
+        flashcardId: card.id,
+        correct,
+        rating: correct ? 3 : 1,
+      },
+    });
+    await tx.flashcard.update({ where: { id: card.id }, data: schedule });
+
     const player = reward.xp
       ? await tx.user.update({ where: { id: userId }, data: { xp: { increment: reward.xp } }, select: { xp: true } })
       : await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { xp: true } });
@@ -103,6 +163,8 @@ async function answerQuestion(userId: string, runId: string, questionIndex: numb
       sparksEarned: updated.sparksEarned,
       player: { xp: player.xp, level: levelForXp(player.xp), sparks: profile.sparks },
       material: correct && run.mode === "BUILD" ? question.material : null,
+      mastery,
+      schedule,
     };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
@@ -124,7 +186,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   } catch (error) {
     const code = error instanceof Error ? error.message : "GAME_ERROR";
     if (code === "NEED_CARDS") {return res.status(400).json({ error: "Add at least 3 flashcards to unlock learning games." });}
-    if (["RUN_CLOSED", "BAD_ANSWER", "ALREADY_ANSWERED"].includes(code)) {return res.status(409).json({ error: "That answer was already recorded. Your rewards are safe." });}
+    if (["RUN_CLOSED", "BAD_ANSWER", "ALREADY_ANSWERED", "CARD_NOT_FOUND"].includes(code)) {return res.status(409).json({ error: "That answer could not be recorded. Your rewards are safe." });}
     console.error("game run error", error);
     return res.status(500).json({ error: "The game could not continue. Please try again." });
   }

@@ -12,6 +12,7 @@ import {
   moderateK12Content,
 } from "@/lib/childSafety";
 import { retrieveSourceChunks } from "@/lib/sourceIngestion";
+import { removeInvalidCitationLabels, validateCitationLabels } from "@/lib/sourceAttribution";
 import { recordAiTrace } from "@/lib/aiObservability";
 import { isAiFreeTestMode, localGroundedTutorReply } from "@/lib/aiFreeTestMode";
 import { AiCreditLimitError, aiCreditErrorResponse, withAiCredits } from "@/lib/aiCredits";
@@ -203,15 +204,20 @@ async function handler(
       generatedReply,
       "TUTOR_OUTPUT"
     );
-    const reply = outputSafety.allowed
+    const responseText = outputSafety.allowed
       ? generatedReply
       : outputSafety.safeResponse ?? "I can’t provide that response safely.";
-    const usedLabels = new Set(
-      [...reply.matchAll(/\[(S\d+)\]/g)].map((match) => match[1])
-    );
-    const citedChunks = usedLabels.size > 0
-      ? groundedChunks.filter((chunk) => usedLabels.has(chunk.label))
-      : groundedChunks;
+    const citationValidation = useStudyMaterial && outputSafety.allowed
+      ? validateCitationLabels(responseText, groundedChunks.map((chunk) => chunk.label))
+      : null;
+    const citedChunks = citationValidation
+      ? groundedChunks.filter((chunk) => citationValidation.validLabels.includes(chunk.label))
+      : [];
+    const reply = outputSafety.allowed && useStudyMaterial && citedChunks.length === 0
+      ? "I found relevant material, but I could not verify a source citation for the answer. Please ask the question again so I can provide a checkable response from your notes."
+      : outputSafety.allowed
+        ? removeInvalidCitationLabels(responseText, groundedChunks.map((chunk) => chunk.label))
+        : responseText;
     const citations: Citation[] = useStudyMaterial
       ? citedChunks.map((chunk) => ({
           label: chunk.label,
@@ -224,7 +230,10 @@ async function handler(
       : [];
     const attribution = {
       mode: useStudyMaterial ? "UPLOADED_MATERIAL" : "GENERAL_KNOWLEDGE",
-      label: useStudyMaterial ? "Study material" : "General knowledge",
+      label: useStudyMaterial
+        ? citations.length > 0 ? "Study material · cited" : "Study material · citation unavailable"
+        : "General knowledge",
+      citationStatus: useStudyMaterial ? citationValidation?.status ?? "MISSING" : "NOT_APPLICABLE",
       citations,
     };
     await recordAiTrace({
@@ -238,7 +247,7 @@ async function handler(
       latencyMs: Date.now() - modelStartedAt,
       allowed: outputSafety.allowed,
       safetyCategory: outputSafety.category,
-      grounded: useStudyMaterial,
+      grounded: useStudyMaterial && citations.length > 0,
       citationCount: citations.length,
     });
 

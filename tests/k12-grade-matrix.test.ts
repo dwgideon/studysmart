@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   GRADE_LEVELS,
+  experienceForGrade,
   gradeBandFor,
   tutorPromptForGrade,
   type GradeBand,
@@ -57,6 +58,21 @@ test("every grade receives six valid, unique readiness skills", () => {
       assert.equal("answer" in publicQuestion(question), false, "answers stay server-only");
     }
   }
+});
+
+test("K–8 experience config changes interaction style by age band", () => {
+  const early = experienceForGrade("K");
+  const elementary = experienceForGrade("4");
+  const middle = experienceForGrade("8");
+
+  assert.equal(early.readAloud, "REQUIRED");
+  assert.equal(early.visualSupport, "PRIMARY");
+  assert.ok(early.responseModes.includes("oral-response"));
+  assert.equal(elementary.readAloud, "PREFERRED");
+  assert.ok(elementary.responseModes.includes("match-and-sort"));
+  assert.equal(middle.readAloud, "OPTIONAL");
+  assert.ok(middle.responseModes.includes("evidence-check"));
+  assert.notEqual(early.tutorWordLimit, middle.tutorWordLimit);
 });
 
 test("adaptive diagnostics can complete all skills for every grade", () => {

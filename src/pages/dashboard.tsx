@@ -25,6 +25,10 @@ type ConceptMastery = {
   confidence: number;
   status: "NEW" | "LEARNING" | "DEVELOPING" | "MASTERED";
   attempts: number;
+  due?: boolean;
+  predictedRetention?: number;
+  priority?: number;
+  recommendedMode?: string;
 };
 
 type MasterySummary = {
@@ -272,7 +276,11 @@ function DashboardContent() {
                 </div>
                 <div className={styles.conceptMeta}>
                   <span>{masteryLabel(concept.status)}</span>
-                  <span>{concept.attempts} attempts</span>
+                  <span>
+                    {concept.due
+                      ? "Due now"
+                      : `${concept.predictedRetention ?? 0}% predicted retention`}
+                  </span>
                 </div>
               </article>
             ))}

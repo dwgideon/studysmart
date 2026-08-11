@@ -85,17 +85,70 @@ export function gradeBandFor(gradeLevel: string): GradeBand {
   return "HIGH";
 }
 
-export function tutorPromptForGrade(gradeLevel: string) {
+export type K12ExperienceConfig = {
+  band: GradeBand;
+  displayLabel: string;
+  tutorWordLimit: number;
+  readAloud: "REQUIRED" | "PREFERRED" | "OPTIONAL";
+  visualSupport: "PRIMARY" | "HELPFUL" | "SECONDARY";
+  responseModes: readonly string[];
+  labels: { dashboard: string; tutor: string; study: string };
+};
+
+/** Shared age-appropriate product contract for web, mobile, tutor, and games. */
+export function experienceForGrade(gradeLevel: string): K12ExperienceConfig {
   const band = gradeBandFor(gradeLevel);
-  const prompts: Record<GradeBand, string> = {
-    EARLY:
-      "Teach a K–2 learner using one idea at a time, very short sentences, familiar examples, and encouraging check-ins. Avoid unexplained jargon. Stay under 100 words.",
-    ELEMENTARY:
-      "Teach a grades 3–5 learner with short paragraphs, concrete examples, friendly check-ins, and no unnecessary jargon. Stay under 150 words.",
-    MIDDLE:
-      "Teach a grades 6–8 learner with clear sections, short steps, and concrete examples. Stay under 200 words.",
-    HIGH:
-      "Teach a grades 9–12 learner with concise explanations, readable formulas, worked reasoning, and connections to prerequisite ideas.",
+  if (band === "EARLY") {
+    return {
+      band,
+      displayLabel: "K–2 early learner",
+      tutorWordLimit: 100,
+      readAloud: "REQUIRED",
+      visualSupport: "PRIMARY",
+      responseModes: ["picture-choice", "oral-response", "tap-and-sort"],
+      labels: { dashboard: "My learning adventure", tutor: "Learning helper", study: "Practice" },
+    };
+  }
+  if (band === "ELEMENTARY") {
+    return {
+      band,
+      displayLabel: "Grades 3–5 elementary learner",
+      tutorWordLimit: 150,
+      readAloud: "PREFERRED",
+      visualSupport: "HELPFUL",
+      responseModes: ["multiple-choice", "short-answer", "match-and-sort"],
+      labels: { dashboard: "My learning path", tutor: "Learning coach", study: "Practice" },
+    };
+  }
+  if (band === "MIDDLE") {
+    return {
+      band,
+      displayLabel: "Grades 6–8 middle school learner",
+      tutorWordLimit: 200,
+      readAloud: "OPTIONAL",
+      visualSupport: "SECONDARY",
+      responseModes: ["multiple-choice", "constructed-response", "evidence-check"],
+      labels: { dashboard: "Dashboard", tutor: "Tutor", study: "Study" },
+    };
+  }
+  return {
+    band,
+    displayLabel: "High school learner",
+    tutorWordLimit: 240,
+    readAloud: "OPTIONAL",
+    visualSupport: "SECONDARY",
+    responseModes: ["multiple-choice", "constructed-response", "synthesis"],
+    labels: { dashboard: "Dashboard", tutor: "Tutor", study: "Study" },
   };
-  return prompts[band];
+}
+
+export function tutorPromptForGrade(gradeLevel: string) {
+  const config = experienceForGrade(gradeLevel);
+  const prompts: Record<GradeBand, string> = {
+    EARLY: "Teach a K–2 learner one idea at a time using very short sentences, familiar examples, visible words, and an invitation to listen and say the answer aloud. Avoid unexplained jargon.",
+    ELEMENTARY: "Teach a grades 3–5 learner with short paragraphs, concrete examples, visible vocabulary, and friendly check-ins. Define new words before using them.",
+    MIDDLE: "Teach a grades 6–8 learner with clear sections, short steps, concrete examples, and occasional evidence checks. Name prerequisite ideas when they matter.",
+    HIGH: "Teach a grades 9–12 learner with concise explanations, readable formulas, worked reasoning, and explicit connections to prerequisite ideas.",
+  };
+  return `${prompts[config.band]} Keep the response under ${config.tutorWordLimit} words.`;
 }

@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useUser } from "@supabase/auth-helpers-react";
-import { gradeBandFor, type GradeBand } from "@/lib/learningProfile";
+import { experienceForGrade, type GradeBand, type K12ExperienceConfig } from "@/lib/learningProfile";
 import { supabase } from "@/lib/supabaseClient";
 
 type Experience = {
   gradeLevel: string | null;
   gradeBand: GradeBand | null;
+  config: K12ExperienceConfig | null;
   labels: { dashboard: string; tutor: string; study: string };
 };
 
@@ -13,6 +14,7 @@ const DEFAULT_LABELS = { dashboard: "Dashboard", tutor: "Tutor", study: "Study" 
 const ExperienceContext = createContext<Experience>({
   gradeLevel: null,
   gradeBand: null,
+  config: null,
   labels: DEFAULT_LABELS,
 });
 
@@ -60,13 +62,13 @@ export function K12ExperienceProvider({ children }: { children: React.ReactNode 
   }, [user]);
 
   const value = useMemo<Experience>(() => {
-    const gradeBand = gradeLevel ? gradeBandFor(gradeLevel) : null;
-    const labels = gradeBand === "EARLY"
-      ? { dashboard: "My learning adventure", tutor: "Learning helper", study: "Practice" }
-      : gradeBand === "ELEMENTARY"
-        ? { dashboard: "My learning path", tutor: "Learning coach", study: "Practice" }
-        : DEFAULT_LABELS;
-    return { gradeLevel, gradeBand, labels };
+    const config = gradeLevel ? experienceForGrade(gradeLevel) : null;
+    return {
+      gradeLevel,
+      gradeBand: config?.band ?? null,
+      config,
+      labels: config?.labels ?? DEFAULT_LABELS,
+    };
   }, [gradeLevel]);
 
   useEffect(() => {

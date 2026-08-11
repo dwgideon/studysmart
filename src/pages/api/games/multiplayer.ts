@@ -19,6 +19,8 @@ import {
 import { databaseTransaction, prisma } from "@/lib/prisma";
 import { consumeRateLimit } from "@/lib/rateLimit";
 import { withApiMonitoring } from "@/lib/apiMonitoring";
+import { recordMasteryEvidence } from "@/lib/masteryService";
+import { scheduleNextReview } from "@/lib/spacedRepetition";
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -325,6 +327,21 @@ async function answerQuestion(userId: string, rawCode: unknown, rawSelectedIndex
     const questions = room.questions as unknown as StoredMultiplayerQuestion[];
     const question = questions[room.currentQuestion];
     if (!question || question.options[selectedIndex] === undefined) {throw new Error("BAD_ANSWER");}
+    const card = await tx.flashcard.findFirst({
+      where: { id: question.cardId, userId },
+      select: {
+        id: true,
+        conceptId: true,
+        intervalDays: true,
+        easeFactor: true,
+        scheduledReviewCount: true,
+        lapseCount: true,
+        memoryStability: true,
+        memoryDifficulty: true,
+        targetRetention: true,
+      },
+    });
+    if (!card) {throw new Error("BAD_ANSWER");}
     const correct = question.correctIndex === selectedIndex;
     const points = multiplayerScore(correct, question.value, room.roundStartedAt, room.roundEndsAt, now);
     const reward = rewardForQuestion(correct, question.difficulty, participant.rewardsEnabled);
@@ -348,6 +365,42 @@ async function answerQuestion(userId: string, rawCode: unknown, rawSelectedIndex
         sparksEarned: { increment: reward.sparks },
       },
     });
+    let masteryScore = 0;
+    if (card.conceptId) {
+      const recorded = await recordMasteryEvidence(tx, {
+        userId,
+        conceptId: card.conceptId,
+        sourceType: "MULTIPLAYER_ANSWER",
+        sourceId: room.id,
+        correct,
+        difficulty: Math.min(1, Math.max(0, question.difficulty / 3)),
+        responseTimeMs: Math.max(0, now.getTime() - room.roundStartedAt.getTime()),
+        independent: true,
+      });
+      masteryScore = recorded.score;
+    }
+    const schedule = scheduleNextReview({
+      correct,
+      intervalDays: card.intervalDays,
+      easeFactor: card.easeFactor,
+      reviewCount: card.scheduledReviewCount,
+      lapseCount: card.lapseCount,
+      masteryScore,
+      rating: correct ? 3 : 1,
+      memoryStability: card.memoryStability,
+      memoryDifficulty: card.memoryDifficulty,
+      targetRetention: card.targetRetention,
+    });
+    await tx.cardReview.create({
+      data: {
+        userId,
+        flashcardId: card.id,
+        correct,
+        responseTimeMs: Math.max(0, now.getTime() - room.roundStartedAt.getTime()),
+        rating: correct ? 3 : 1,
+      },
+    });
+    await tx.flashcard.update({ where: { id: card.id }, data: schedule });
     if (reward.xp) {
       await tx.user.update({ where: { id: userId }, data: { xp: { increment: reward.xp } } });
     }
