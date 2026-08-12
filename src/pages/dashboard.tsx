@@ -189,6 +189,9 @@ function DashboardContent() {
           <Link href="/study" className={styles.primaryBtn}>
             Study
           </Link>
+          <Link href="/studio" className={styles.primaryBtn}>
+            Study Studio
+          </Link>
           <Link href="/smart" className={styles.primaryBtn}>
             Smart review
           </Link>

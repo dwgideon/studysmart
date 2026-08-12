@@ -68,7 +68,7 @@ function UploadForm() {
 
       const result = await res.json();
       if (result.sessionId) {
-        router.push(`/results?sessionId=${result.sessionId}`);
+        router.push(`/studio?sessionId=${encodeURIComponent(result.sessionId)}`);
       } else {
         throw new Error("No sessionId returned from API.");
       }
