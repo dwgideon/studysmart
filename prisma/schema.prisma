@@ -34,17 +34,17 @@ model User {
   masteryEvidence         MasteryEvidence[]
   tutorConversations      TutorConversation[]
   sourceMaterials         SourceMaterial[]
-  classroomsTaught        Classroom[]              @relation("ClassroomTeacher")
+  classroomsTaught        Classroom[]               @relation("ClassroomTeacher")
   classroomMemberships    ClassroomMembership[]
-  guardianLinks           GuardianStudent[]        @relation("GuardianLinks")
-  guardians               GuardianStudent[]        @relation("StudentGuardians")
+  guardianLinks           GuardianStudent[]         @relation("GuardianLinks")
+  guardians               GuardianStudent[]         @relation("StudentGuardians")
   guardianInvites         GuardianInvite[]
-  assignmentsCreated      Assignment[]             @relation("AssignmentTeacher")
+  assignmentsCreated      Assignment[]              @relation("AssignmentTeacher")
   assignmentSubmissions   AssignmentSubmission[]
   diagnosticAssessments   DiagnosticAssessment[]
   privacySettings         PrivacySettings?
-  consentsGiven           ConsentRecord[]          @relation("ConsentActor")
-  consentsFor             ConsentRecord[]          @relation("ConsentSubject")
+  consentsGiven           ConsentRecord[]           @relation("ConsentActor")
+  consentsFor             ConsentRecord[]           @relation("ConsentSubject")
   roleVerifications       RoleVerification[]
   safetyEvents            SafetyEvent[]
   safetyViolations        SafetyViolation[]
@@ -58,17 +58,19 @@ model User {
   aiInteractionTraces     AiInteractionTrace[]
   experimentAssignments   ExperimentAssignment[]
   experimentEvents        ExperimentEvent[]
-  organizationsCreated    Organization[]           @relation("OrganizationCreator")
+  organizationsCreated    Organization[]            @relation("OrganizationCreator")
   organizationMemberships OrganizationMembership[]
   gameProfile             GameProfile?
   gameRuns                GameRun[]
   avatarItems             AvatarItemOwnership[]
-  multiplayerRoomsHosted  MultiplayerRoom[]        @relation("MultiplayerRoomHost")
+  multiplayerRoomsHosted  MultiplayerRoom[]         @relation("MultiplayerRoomHost")
   multiplayerParticipants MultiplayerParticipant[]
-  subscriptionsPaid       BillingSubscription[]    @relation("SubscriptionPayer")
-  subscriptionsReceived   BillingSubscription[]    @relation("SubscriptionBeneficiary")
+  subscriptionsPaid       BillingSubscription[]     @relation("SubscriptionPayer")
+  subscriptionsReceived   BillingSubscription[]     @relation("SubscriptionBeneficiary")
   aiUsageMonths           AiUsageMonth[]
   aiUsageEvents           AiUsageEvent[]
+  curriculumAttempts      CurriculumLessonAttempt[]
+  curriculumEvents        CurriculumLessonEvent[]
 
   @@index([email])
 }
@@ -273,13 +275,14 @@ model Course {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                  User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   studySessions         StudySession[]
   concepts              Concept[]
   tutorConversations    TutorConversation[]
   savedQuizzes          SavedQuiz[]
   sourceMaterials       SourceMaterial[]
   diagnosticAssessments DiagnosticAssessment[]
+  curriculumAttempts    CurriculumLessonAttempt[]
 
   @@index([userId])
   @@index([userId, isPrimary])
@@ -1295,4 +1298,188 @@ model OperationalRun {
 
   @@index([job, status, startedAt])
   @@index([startedAt])
+}
+
+model CurriculumUnit {
+  id                   String   @id
+  version              Int      @default(1)
+  status               String   @default("DRAFT")
+  title                String
+  description          String
+  grade                String
+  subject              String
+  standards            Json
+  prerequisiteConcepts Json
+  source               Json
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  lessons CurriculumLesson[]
+
+  @@index([grade, subject, status])
+}
+
+model CurriculumLesson {
+  id                        String    @id
+  unitId                    String
+  version                   Int       @default(1)
+  schemaVersion             String
+  status                    String    @default("DRAFT")
+  sequence                  Int
+  title                     String
+  grade                     String
+  subject                   String
+  learningObjective         String
+  prerequisites             Json
+  standards                 Json
+  teacherExplanation        String
+  studentExplanation        String
+  workedExample             Json
+  guidedPractice            Json
+  independentPractice       Json
+  misconceptionChecks       Json
+  exitTicket                Json
+  readAloudScript           Json
+  accessibilityAlternatives Json
+  remediationPath           Json
+  extensionPath             Json
+  masteryEvidenceRules      Json
+  reviewSchedule            Json
+  source                    Json
+  humanApprovedAt           DateTime?
+  educatorReviewer          String?
+  accessibilityReviewedAt   DateTime?
+  safetyReviewedAt          DateTime?
+  publishedAt               DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  unit          CurriculumUnit             @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  concepts      CurriculumConcept[]
+  questions     CurriculumQuestion[]
+  flashcards    CurriculumFlashcard[]
+  gamePrompts   CurriculumGamePrompt[]
+  tutorPrompts  CurriculumTutorPrompt[]
+  attempts      CurriculumLessonAttempt[]
+  events        CurriculumLessonEvent[]
+  reviewRecords CurriculumReviewSchedule[]
+
+  @@unique([unitId, sequence, version])
+  @@index([unitId, sequence])
+  @@index([status, grade, subject])
+}
+
+model CurriculumConcept {
+  id              String   @id
+  lessonId        String
+  name            String
+  description     String
+  prerequisiteIds Json
+  createdAt       DateTime @default(now())
+
+  lesson CurriculumLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
+}
+
+model CurriculumQuestion {
+  id          String @id
+  lessonId    String
+  prompt      String
+  options     Json
+  answerIndex Int
+  explanation String
+  conceptKey  String
+  difficulty  String
+
+  lesson CurriculumLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId, conceptKey])
+}
+
+model CurriculumFlashcard {
+  id         String @id
+  lessonId   String
+  front      String
+  back       String
+  conceptKey String
+
+  lesson CurriculumLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId, conceptKey])
+}
+
+model CurriculumGamePrompt {
+  id       String @id
+  lessonId String
+  mode     String
+  prompt   Json
+
+  lesson CurriculumLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId, mode])
+}
+
+model CurriculumTutorPrompt {
+  id       String @id
+  lessonId String
+  prompt   String
+  context  Json
+
+  lesson CurriculumLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
+}
+
+model CurriculumReviewSchedule {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lessonId         String
+  version          Int      @default(1)
+  intervalsDays    Json
+  retentionTarget  Float
+  masteryThreshold Float
+  createdAt        DateTime @default(now())
+
+  lesson CurriculumLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, version])
+  @@index([lessonId])
+}
+
+model CurriculumLessonAttempt {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String    @db.Uuid
+  lessonId          String
+  courseId          String?   @db.Uuid
+  status            String    @default("IN_PROGRESS")
+  responses         Json      @default("[]")
+  evidence          Json      @default("[]")
+  score             Float?
+  exitTicketCorrect Boolean?
+  durationMs        Int?
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson CurriculumLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  course Course?          @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  @@index([userId, startedAt])
+  @@index([lessonId, status])
+  @@index([courseId, completedAt])
+}
+
+model CurriculumLessonEvent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  lessonId  String
+  eventType String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson CurriculumLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([userId, eventType, createdAt])
+  @@index([lessonId, eventType, createdAt])
 }

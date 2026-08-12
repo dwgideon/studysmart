@@ -84,6 +84,7 @@ function StudioContent() {
             <span className={styles.signalDot} />
             <strong>{config?.displayLabel ?? "K–8 learning path"}</strong>
             <small>{config?.readAloud === "REQUIRED" ? "Words shown and read aloud" : "Built for understanding, not guessing"}</small>
+            <Link href="/curriculum" className={styles.secondary}>Explore authored lessons →</Link>
           </div>
         </header>
 

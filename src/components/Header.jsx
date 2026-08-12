@@ -21,6 +21,7 @@ export default function Header() {
   const links = [
     ["/upload", "Add material"],
     ["/library", "Library"],
+    ["/curriculum", "Curriculum"],
     ["/studio", "Study Studio"],
     ["/study", labels.study],
     ["/tutor", labels.tutor],

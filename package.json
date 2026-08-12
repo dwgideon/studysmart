@@ -17,6 +17,7 @@
     "check:knip": "knip",
     "check:tsprune": "ts-prune -p tsconfig.json",
     "check:deps": "depcheck --ignores='@types/*,eslint*,typescript,ts-node'",
+    "curriculum:seed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/seed-curriculum.mjs",
     "check:mobile": "npm --prefix apps/mobile run lint && npm --prefix apps/mobile run typecheck",
     "build:mobile": "npm --prefix apps/mobile run test:bundle",
     "check:all": "npm run test && npm run build --silent && npm run check:knip && npm run check:tsprune && npm run check:deps"
