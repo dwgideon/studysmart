@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { listPilotUnits } from "@/lib/pilotCurriculum";
 import { evaluateLessonQuality } from "@/lib/curriculumQuality";
-import type { LibraryGrade, LibrarySubject } from "@/lib/studyLibrary";
+import { getOriginalLibraryStats, K8_GRADES, LIBRARY_SUBJECTS, listOriginalSets, type LibraryGrade, type LibrarySubject } from "@/lib/studyLibrary";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {return res.status(405).json({ error: "Method not allowed" });}
@@ -19,5 +19,11 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     source: unit.source,
     lessons: unit.lessons.map((lesson) => ({ id: lesson.id, sequence: lesson.sequence, title: lesson.title, objective: lesson.learningObjective, status: lesson.status, quality: evaluateLessonQuality(lesson) })),
   }));
-  return res.status(200).json({ units, pilot: true, catalogVersion: "2026.08-pilot-1" });
+  const libraryStats = getOriginalLibraryStats();
+  const catalog = {
+    ...libraryStats,
+    subjectLanes: [...LIBRARY_SUBJECTS],
+    byGrade: K8_GRADES.map((item) => ({ grade: item, setCount: listOriginalSets({ grade: item }).length })),
+  };
+  return res.status(200).json({ units, pilot: true, catalog, catalogVersion: "2026.08-k8-1" });
 }

@@ -5,6 +5,8 @@ export const LIBRARY_SUBJECTS = [
   "Math",
   "Science",
   "Reading",
+  "Grammar",
+  "English",
   "Writing",
   "History",
   "Vocabulary",
@@ -28,6 +30,8 @@ export type OriginalSet = {
   flashcardCount: number;
   questionCount: number;
   readAloud: boolean;
+  gradeFocus: string;
+  editorialApproach: string;
   source: {
     label: "StudySmart Originals";
     kind: "ORIGINAL";
@@ -74,6 +78,24 @@ const BLUEPRINTS: Record<"K–2" | "3–5" | "6–8", Blueprint[]> = {
         { topic: "Story Structure & Character Thinking", summary: "Use story elements and evidence to explain what characters want, do, and learn.", goals: ["Retell a story in a logical sequence", "Describe characters using actions and details", "Explain how a problem changes across the story"], standards: ["CCSS ELA K–2 · Literature"], prerequisites: ["Listening comprehension", "Sequence words"], skills: ["retelling", "characters", "sequence", "evidence"] },
         { topic: "Main Idea & Informational Text", summary: "Read to learn by finding key details, asking questions, and explaining the main idea.", goals: ["Ask and answer questions about a text", "Name the main topic and supporting details", "Use headings, captions, and diagrams to locate information"], standards: ["CCSS ELA K–2 · Informational Text"], prerequisites: ["Topic vocabulary", "Picture-to-word connections"], skills: ["main idea", "details", "text features", "questions"] },
         { topic: "Compare, Connect & Explain", summary: "Make thoughtful connections across stories and texts using clear evidence and language.", goals: ["Compare two texts on a shared topic", "Connect an event to a personal or community experience", "Explain an idea with a complete sentence and evidence"], standards: ["CCSS ELA K–2 · Reading Comprehension"], prerequisites: ["Retelling", "Finding details"], skills: ["compare", "connect", "explain", "evidence"] },
+      ],
+    },
+    {
+      subject: "Grammar",
+      units: [
+        { topic: "Complete Sentences & Word Jobs", summary: "Build complete thoughts and notice the jobs words do in a sentence.", goals: ["Tell a complete thought from a word group", "Name nouns and verbs in a simple sentence", "Add a describing word to make meaning clearer"], standards: ["CCSS ELA K–2 · Language"], prerequisites: ["Oral sentence practice", "Recognize common words"], skills: ["sentences", "nouns", "verbs", "describing words"] },
+        { topic: "Capitals, Spaces & End Marks", summary: "Use print conventions that help a reader know where a sentence starts, pauses, and ends.", goals: ["Use a capital at the start of a sentence", "Leave spaces between words", "Choose a period, question mark, or exclamation mark"], standards: ["CCSS ELA K–2 · Language & Conventions"], prerequisites: ["Letter formation", "Sentence meaning"], skills: ["capitalization", "spacing", "punctuation", "editing"] },
+        { topic: "Nouns, Verbs & Describing Words", summary: "Choose precise words for people, places, things, actions, and qualities.", goals: ["Sort common nouns and verbs", "Match an action word to a subject", "Choose a describing word that fits a noun"], standards: ["CCSS ELA K–2 · Parts of Speech"], prerequisites: ["Complete sentences", "Oral vocabulary"], skills: ["nouns", "verbs", "adjectives", "word choice"] },
+        { topic: "Questions, Commands & Joining Ideas", summary: "Use sentence types and joining words to communicate a complete idea.", goals: ["Recognize a statement, question, and command", "Use because or and to join two ideas", "Reread a sentence to check its meaning"], standards: ["CCSS ELA K–2 · Language & Syntax"], prerequisites: ["End punctuation", "Complete thoughts"], skills: ["sentence types", "conjunctions", "syntax", "revision"] },
+      ],
+    },
+    {
+      subject: "English",
+      units: [
+        { topic: "Listening & Speaking Clearly", summary: "Listen for meaning and share ideas with clear words, turns, and voice.", goals: ["Follow and give a short set of directions", "Ask a question that matches the topic", "Speak in a complete sentence and take turns"], standards: ["CCSS ELA K–2 · Speaking & Listening"], prerequisites: ["Oral language", "Conversation turns"], skills: ["listening", "speaking", "questions", "conversation"] },
+        { topic: "Read-Aloud Thinking", summary: "Use read-alouds, pictures, and talk to make meaning before independent reading is fluent.", goals: ["Retell the important parts of a read-aloud", "Use a picture or detail to explain an idea", "Ask and answer a who, what, where, or why question"], standards: ["CCSS ELA K–2 · Literature & Informational Text"], prerequisites: ["Listening comprehension", "Story sequence"], skills: ["read-aloud", "retelling", "questions", "details"] },
+        { topic: "Words for Learning", summary: "Use school words for time, place, cause, comparison, and explanation.", goals: ["Use first, next, and last to explain steps", "Compare two ideas with same and different", "Explain a new word with a picture or example"], standards: ["CCSS ELA K–2 · Academic Language"], prerequisites: ["Everyday vocabulary", "Oral sentence practice"], skills: ["sequence", "compare", "explain", "academic language"] },
+        { topic: "Tell, Show & Present", summary: "Plan a short story or explanation and share it with a listener.", goals: ["Choose a topic and name the important parts", "Use a picture, object, or gesture to support meaning", "Speak loudly enough and respond to one listener question"], standards: ["CCSS ELA K–2 · Speaking & Presentation"], prerequisites: ["Complete sentences", "Retelling"], skills: ["presentation", "organization", "details", "audience"] },
       ],
     },
     {
@@ -133,6 +155,24 @@ const BLUEPRINTS: Record<"K–2" | "3–5" | "6–8", Blueprint[]> = {
       ],
     },
     {
+      subject: "Grammar",
+      units: [
+        { topic: "Parts of Speech in Context", summary: "Use the job a word performs in a sentence to make meaning precise.", goals: ["Identify nouns, pronouns, verbs, adjectives, and adverbs in context", "Explain how a word’s job affects a sentence", "Replace a vague word with a precise choice"], standards: ["CCSS ELA 3–5 · Language"], prerequisites: ["Complete sentences", "Basic word classes"], skills: ["parts of speech", "syntax", "precision", "editing"] },
+        { topic: "Verb Tense & Agreement", summary: "Keep time and subject relationships clear when writing and speaking.", goals: ["Maintain consistent verb tense", "Match a subject and verb", "Revise a sentence when the time or subject changes"], standards: ["CCSS ELA 3–5 · Language & Conventions"], prerequisites: ["Sentence parts", "Common verb forms"], skills: ["verb tense", "agreement", "revision", "clarity"] },
+        { topic: "Compound & Complex Sentences", summary: "Join ideas with conjunctions and clauses so relationships are clear.", goals: ["Join related ideas with coordinating conjunctions", "Recognize a dependent clause", "Choose a sentence structure that fits the relationship"], standards: ["CCSS ELA 3–5 · Syntax"], prerequisites: ["Complete sentences", "Conjunctions"], skills: ["clauses", "conjunctions", "sentence variety", "relationships"] },
+        { topic: "Punctuation & Editing", summary: "Use commas, quotation marks, apostrophes, and paragraph breaks to guide readers.", goals: ["Use commas in a series and after an introduction", "Punctuate dialogue and quotations", "Edit a paragraph for conventions and meaning"], standards: ["CCSS ELA 3–5 · Language & Conventions"], prerequisites: ["End punctuation", "Paragraph structure"], skills: ["commas", "dialogue", "apostrophes", "editing"] },
+      ],
+    },
+    {
+      subject: "English",
+      units: [
+        { topic: "Discussion & Presentation", summary: "Build on ideas, ask useful questions, and present information in a logical order.", goals: ["Refer to a text or source during discussion", "Ask a follow-up question that moves thinking forward", "Organize a short presentation with an opening and closing"], standards: ["CCSS ELA 3–5 · Speaking & Listening"], prerequisites: ["Complete sentences", "Main idea and details"], skills: ["discussion", "questions", "presentation", "organization"] },
+        { topic: "Literature Talk & Interpretation", summary: "Use specific details from stories, poems, and plays to explain an interpretation.", goals: ["Support an idea about a character or theme with details", "Compare how two texts treat a similar idea", "Respond to another interpretation respectfully"], standards: ["CCSS ELA 3–5 · Literature & Speaking"], prerequisites: ["Evidence sentences", "Story elements"], skills: ["interpretation", "discussion", "comparison", "evidence"] },
+        { topic: "Research & Source Use", summary: "Ask questions, take notes, and communicate what sources actually show.", goals: ["Turn a broad topic into a research question", "Group notes by idea rather than by website", "Paraphrase a source and record where it came from"], standards: ["CCSS ELA 3–5 · Research to Build Knowledge"], prerequisites: ["Main idea", "Note-taking"], skills: ["research", "notes", "paraphrase", "sources"] },
+        { topic: "Clear Communication & Revision", summary: "Make writing and speech easier to follow by checking purpose, audience, and organization.", goals: ["Name the purpose and audience for a message", "Choose details that support the purpose", "Revise for clarity after reader or listener feedback"], standards: ["CCSS ELA 3–5 · Writing & Speaking"], prerequisites: ["Paragraph organization", "Sentence conventions"], skills: ["audience", "purpose", "clarity", "revision"] },
+      ],
+    },
+    {
       subject: "Writing",
       units: [
         { topic: "Paragraphs, Organization & Elaboration", summary: "Build focused paragraphs with a clear idea, logical order, and meaningful details.", goals: ["Write a topic sentence that matches the paragraph", "Group details logically", "Elaborate with examples, reasons, and precise language"], standards: ["CCSS ELA 3–5 · Writing & Language"], prerequisites: ["Complete sentences", "Main idea"], skills: ["paragraphs", "organization", "elaboration", "transitions"] },
@@ -189,6 +229,24 @@ const BLUEPRINTS: Record<"K–2" | "3–5" | "6–8", Blueprint[]> = {
       ],
     },
     {
+      subject: "Grammar",
+      units: [
+        { topic: "Sentence Structure & Clauses", summary: "Analyze how clauses and phrases work together to control meaning, emphasis, and flow.", goals: ["Identify independent and dependent clauses", "Use sentence structures that show logical relationships", "Repair fragments, run-ons, and unclear joins"], standards: ["CCSS ELA 6–8 · Language & Syntax"], prerequisites: ["Complete sentences", "Compound and complex sentences"], skills: ["clauses", "syntax", "sentence boundaries", "revision"] },
+        { topic: "Verbals, Voice & Mood", summary: "Choose verb forms and sentence voice that make time, agency, and purpose clear.", goals: ["Use verbals and phrases without dangling modifiers", "Compare active and passive voice", "Choose a mood that fits the speaker’s purpose"], standards: ["CCSS ELA 6–8 · Language"], prerequisites: ["Verb tense and agreement", "Parts of speech"], skills: ["verbals", "voice", "mood", "style"] },
+        { topic: "Punctuation, Syntax & Style", summary: "Use punctuation and sentence design to signal relationships and create deliberate emphasis.", goals: ["Use semicolons, colons, dashes, and parentheses accurately", "Explain how punctuation changes a reading", "Revise sentence patterns for rhythm and emphasis"], standards: ["CCSS ELA 6–8 · Language & Conventions"], prerequisites: ["Clause structure", "Comma rules"], skills: ["punctuation", "syntax", "style", "emphasis"] },
+        { topic: "Editing for Precision & Cohesion", summary: "Edit at the word, sentence, and paragraph levels so ideas remain accurate and connected.", goals: ["Replace vague or repetitive language", "Check pronoun reference and modifier placement", "Edit transitions and sentence patterns for cohesion"], standards: ["CCSS ELA 6–8 · Language & Writing"], prerequisites: ["Sentence analysis", "Paragraph cohesion"], skills: ["precision", "cohesion", "editing", "revision"] },
+      ],
+    },
+    {
+      subject: "English",
+      units: [
+        { topic: "Literature, Rhetoric & Interpretation", summary: "Read closely across genres and explain how language, structure, and context shape meaning.", goals: ["Develop an interpretation with precise textual evidence", "Analyze rhetorical choices and their effects", "Distinguish an author’s claim from a reader’s inference"], standards: ["CCSS ELA 6–8 · Literature & Informational Text"], prerequisites: ["Evidence and reasoning", "Author craft"], skills: ["close reading", "rhetoric", "interpretation", "inference"] },
+        { topic: "Speaking, Listening & Academic Discussion", summary: "Participate in discussions that test ideas, represent evidence accurately, and make room for other speakers.", goals: ["Build on or challenge an idea with evidence", "Summarize another speaker’s point before responding", "Adjust tone, pace, and detail for an audience"], standards: ["CCSS ELA 6–8 · Speaking & Listening"], prerequisites: ["Evidence paragraphs", "Discussion norms"], skills: ["discussion", "listening", "evidence", "audience"] },
+        { topic: "Research, Citation & Digital Communication", summary: "Research responsibly, track sources, and communicate findings across digital and print formats.", goals: ["Refine a research question through source reading", "Cite and paraphrase without losing the source’s meaning", "Choose a format and design that fit an audience"], standards: ["CCSS ELA 6–8 · Research & Media Literacy"], prerequisites: ["Source reliability", "Paraphrase and synthesis"], skills: ["research", "citation", "digital literacy", "communication"] },
+        { topic: "Academic Communication & Presentation", summary: "Plan, deliver, and revise explanations and arguments for real audiences and purposes.", goals: ["Sequence an explanation or argument for a listener", "Use visuals or examples without replacing reasoning", "Use feedback to revise delivery and content"], standards: ["CCSS ELA 6–8 · Speaking, Writing & Presentation"], prerequisites: ["Organization", "Audience and purpose"], skills: ["presentation", "argument", "visuals", "revision"] },
+      ],
+    },
+    {
       subject: "Writing",
       units: [
         { topic: "Argument Writing & Counterclaims", summary: "Build a defensible argument with precise claims, evidence, reasoning, and a fair counterclaim.", goals: ["Narrow a claim to a debatable question", "Integrate evidence with explanation", "Address a counterclaim without misrepresenting it"], standards: ["CCSS ELA 6–8 · Argument Writing"], prerequisites: ["Argument reading", "Paragraph cohesion"], skills: ["claim", "evidence", "reasoning", "counterclaim"] },
@@ -233,6 +291,20 @@ function difficultyFor(grade: LibraryGrade, unitIndex: number): OriginalSet["dif
 const gradeLabel = (grade: LibraryGrade) => grade === "K" ? "Kindergarten" : `Grade ${grade}`;
 const slug = (value: string) => value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
+const GRADE_FOCUS: Record<LibraryGrade, string> = {
+  K: "Build language, number sense, routines, and curiosity through concrete examples and talk.",
+  "1": "Move from concrete models to drawings, short explanations, and increasingly independent practice.",
+  "2": "Use efficient strategies, connected details, and complete explanations to show understanding.",
+  "3": "Shift toward fluency, evidence, and multi-step reasoning across texts and problems.",
+  "4": "Connect models to general rules, compare strategies, and support answers with evidence.",
+  "5": "Synthesize ideas, explain relationships, and transfer skills to unfamiliar situations.",
+  "6": "Analyze systems, sources, and representations while making reasoning visible.",
+  "7": "Evaluate evidence, revise models, and communicate nuanced explanations and arguments.",
+  "8": "Integrate skills across disciplines, defend conclusions, and prepare for increasingly independent study.",
+};
+
+const HISTORY_APPROACH = "Literal, source-based history: establish chronology, describe evidence, separate fact from interpretation, and present competing accounts without partisan persuasion.";
+
 export const STUDYSMART_ORIGINALS: OriginalSet[] = K8_GRADES.flatMap((grade) => {
   const band = bandForGrade(grade);
   return BLUEPRINTS[band].flatMap((blueprint) => blueprint.units.map((unit, unitIndex) => ({
@@ -252,6 +324,8 @@ export const STUDYSMART_ORIGINALS: OriginalSet[] = K8_GRADES.flatMap((grade) => 
     flashcardCount: grade === "K" || grade === "1" ? 8 + unitIndex * 2 : grade === "2" || grade === "3" ? 12 + unitIndex * 2 : 16 + unitIndex * 3,
     questionCount: grade === "K" || grade === "1" ? 6 + unitIndex : grade === "2" || grade === "3" ? 8 + unitIndex : 10 + unitIndex,
     readAloud: true,
+    gradeFocus: GRADE_FOCUS[grade],
+    editorialApproach: blueprint.subject === "History" ? HISTORY_APPROACH : "Standards-aligned, skills-first instruction with explicit modeling, guided practice, and transfer.",
     source: {
       label: "StudySmart Originals",
       kind: "ORIGINAL",

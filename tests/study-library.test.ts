@@ -11,10 +11,10 @@ import {
 test("StudySmart Originals cover every K–8 grade and core subject lane", () => {
   const stats = getOriginalLibraryStats();
   assert.equal(stats.grades, 9);
-  assert.equal(stats.subjects, 6);
-  assert.equal(stats.totalSets, 216);
+  assert.equal(stats.subjects, 8);
+  assert.equal(stats.totalSets, 288);
   for (const grade of K8_GRADES) {
-    assert.equal(listOriginalSets({ grade }).length, 24, `expected 24 sets for ${grade}`);
+    assert.equal(listOriginalSets({ grade }).length, 32, `expected 32 sets for ${grade}`);
   }
   for (const subject of LIBRARY_SUBJECTS) {
     assert.equal(listOriginalSets({ subject }).length, 36, `expected 36 sets for ${subject}`);
@@ -36,6 +36,18 @@ test("original library metadata is source-attributed and practice-ready", () => 
     assert.ok(set.flashcardCount >= 8);
     assert.ok(set.questionCount >= 6);
     assert.equal(set.readAloud, true);
+    assert.ok(set.gradeFocus.length > 20);
+    assert.ok(set.editorialApproach.length > 20);
+  }
+});
+
+test("grammar and English have complete K–8 lanes, while history stays literal and source-based", () => {
+  for (const grade of K8_GRADES) {
+    assert.equal(listOriginalSets({ grade, subject: "Grammar" }).length, 4);
+    assert.equal(listOriginalSets({ grade, subject: "English" }).length, 4);
+    const history = listOriginalSets({ grade, subject: "History" });
+    assert.equal(history.length, 4);
+    assert.ok(history.every((set) => /Literal, source-based history/.test(set.editorialApproach)));
   }
 });
 

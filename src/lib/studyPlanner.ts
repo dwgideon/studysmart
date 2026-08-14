@@ -51,7 +51,7 @@ function daysUntil(examDate: Date | null | undefined, now: Date) {
 
 function asSubject(subject: string): LibrarySubject | null {
   const normalized = normalize(subject);
-  return ["Math", "Science", "Reading", "Writing", "History", "Vocabulary"]
+  return ["Math", "Science", "Reading", "Grammar", "English", "Writing", "History", "Vocabulary"]
     .find((value) => normalize(value) === normalized) as LibrarySubject | undefined ?? null;
 }
 

@@ -111,8 +111,13 @@ function OriginalCard({ set, expanded, onToggle }: { set: OriginalSet; expanded:
           <div className={styles.detailGrid}>
             <div><strong>Prerequisites</strong><span>{set.prerequisites.join(" · ")}</span></div>
             <div><strong>Difficulty</strong><span>{set.difficulty.toLocaleLowerCase()}</span></div>
+            <div><strong>Grade focus</strong><span>{set.gradeFocus}</span></div>
             <div><strong>Standards lane</strong><span>{set.standards.join(" · ")}</span></div>
             <div><strong>Access</strong><span>{set.readAloud ? "Read-aloud ready" : "Visual-first"}</span></div>
+          </div>
+          <div className={styles.sourceNote}>
+            <strong>Instructional approach</strong>
+            <span>{set.editorialApproach}</span>
           </div>
           <div className={styles.sourceNote}>
             <strong>Source attribution</strong>
