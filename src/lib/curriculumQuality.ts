@@ -76,6 +76,23 @@ function questionQuality(questions: QuizQuestion[]): QualityCheck[] {
   return checks;
 }
 
+function ageAppropriateQuestionCheck(lesson: CurriculumLesson): QualityCheck {
+  const limits = lesson.grade === "K" ? 15 : lesson.grade === "4" ? 22 : 26;
+  const prompts = lesson.quizQuestions.map((question) => question.prompt);
+  const longPrompts = prompts.filter((prompt) => words(prompt).length > limits);
+  const childJargon = lesson.grade === "K"
+    ? prompts.filter((prompt) => /\b(?:denominator|numerator|abiotic|trophic|phoneme|grapheme|decodable|digraph|CVC|initial|final)\b/i.test(prompt))
+    : [];
+  const passed = longPrompts.length === 0 && childJargon.length === 0 && prompts.every((prompt) => /[?!.]$/.test(prompt));
+  return {
+    id: "age-appropriate-question-language",
+    label: "Age-appropriate question language",
+    passed,
+    severity: "BLOCKER",
+    detail: passed ? `Question stems fit the ${lesson.grade === "K" ? "early-reader" : `Grade ${lesson.grade}`} reading level.` : `Review ${longPrompts.length + childJargon.length} question stem(s) for length or child-facing wording.`,
+  };
+}
+
 export function evaluateLessonQuality(lesson: CurriculumLesson): LessonQualityReport {
   const checks: QualityCheck[] = [];
   const objectiveWords = words(lesson.learningObjective);
@@ -141,6 +158,7 @@ export function evaluateLessonQuality(lesson: CurriculumLesson): LessonQualityRe
     detail: `${lesson.source.kind} content includes attribution and license metadata.`,
   });
   checks.push(...questionQuality(lesson.quizQuestions));
+  checks.push(ageAppropriateQuestionCheck(lesson));
   checks.push({
     id: "mastery-rules",
     label: "Mastery evidence rules",

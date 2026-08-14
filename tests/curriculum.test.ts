@@ -24,6 +24,17 @@ test("every pilot lesson passes the publishing quality gate", () => {
   }
 });
 
+test("question stems speak to the child, not just the standard", () => {
+  const kindergarten = getPilotLesson("pilot-kindergarten-phonics-lesson-1");
+  const fractions = getPilotLesson("pilot-grade4-fractions-lesson-1");
+  const ecosystems = getPilotLesson("pilot-grade6-ecosystems-lesson-1");
+  assert.ok(kindergarten && kindergarten.quizQuestions[0].prompt.startsWith("Tap and count:"));
+  assert.ok(kindergarten && !kindergarten.quizQuestions.some((question) => /denominator|numerator|abiotic|phoneme/i.test(question.prompt)));
+  assert.ok(fractions && fractions.quizQuestions[0].prompt.includes("bottom number"));
+  assert.ok(ecosystems && ecosystems.quizQuestions[0].prompt.includes("nonliving"));
+  assert.ok(ecosystems && ecosystems.quizQuestions[2].prompt.includes("work together"));
+});
+
 test("editorial workflow requires the right review role at every gate", () => {
   assert.equal(nextEditorialStatus("DRAFT", "AUTHOR"), "EDITOR_REVIEW");
   assert.equal(nextEditorialStatus("EDITOR_REVIEW", "EDUCATOR"), "ACCESSIBILITY_REVIEW");

@@ -39,6 +39,104 @@ type LessonSpec = {
   extension: string[];
 };
 
+function lowerFirst(value: string) {
+  return value.charAt(0).toLocaleLowerCase() + value.slice(1);
+}
+
+function ageFriendlyPrompt(grade: LibraryGrade, prompt: string) {
+  const trimmed = prompt.replace(/\s+\?/g, "?").trim();
+  if (grade === "K") {
+    if (/^How many words are in/.test(trimmed)) {return trimmed.replace(/^How many words are in/, "Tap and count: how many words are in");}
+    if (/^How many syllables are in (.+)\?/.test(trimmed)) {return `Clap ${trimmed.match(/^How many syllables are in (.+)\?/)?.[1] ?? "the word"}. How many beats do you hear?`;}
+    if (trimmed === "Which word has two syllables?") {return "Which word has two beats?";}
+    if (trimmed === "What are you counting when you clap a word?") {return "When you clap, what are you counting: beats or letters?";}
+    if (/^Which is a sentence with (.+)\?/.test(trimmed)) {return `Listen: which sentence has ${trimmed.match(/^Which is a sentence with (.+)\?/)?.[1] ?? "three words"}?`;}
+    if (/^What do we tap/.test(trimmed)) {return "What do we tap to count: words, letters, or pictures?";}
+    if (/^What sound starts/.test(trimmed)) {return trimmed.replace(/^What sound starts/, "Say").replace(/\?$/, " slowly. What sound do you hear first?");}
+    if (/^Which word starts/.test(trimmed)) {return trimmed.replace(/^Which word starts/, "Listen: which word starts");}
+    if (/^Where do you listen for an initial sound/.test(trimmed)) {return "Where do you listen first: the beginning, middle, or end?";}
+    if (/^What sound ends/.test(trimmed)) {return trimmed.replace(/^What sound ends/, "Say").replace(/\?$/, " slowly. What sound do you hear last?");}
+    if (/^Which word ends/.test(trimmed)) {return trimmed.replace(/^Which word ends/, "Listen: which word ends");}
+    if (/^Where do you listen for a final sound/.test(trimmed)) {return "Where do you listen last: the beginning, middle, or end?";}
+    if (/^What sound does/.test(trimmed)) {return trimmed.replace(/^What sound does/, "When you see").replace(/ show\?$/, ", what sound do you say?");}
+    if (/^Which letter shows/.test(trimmed)) {return trimmed.replace(/^Which letter shows/, "Which letter makes");}
+    if (/^What helps us read/.test(trimmed)) {return "What helps you read a new word?";}
+    if (/^Which word has short/.test(trimmed)) {return trimmed.replace(/^Which word has/, "Listen for the middle sound. Which word has");}
+    if (/^Which short vowel/.test(trimmed)) {return trimmed.replace(/^Which short vowel/, "Listen: which short vowel");}
+    if (/^Where is the short vowel/.test(trimmed)) {return "In a three-sound word, where do you hear the vowel: start, middle, or end?";}
+    if (/^What does blending do/.test(trimmed)) {return "What happens when we blend sounds together?";}
+    if (trimmed === "What is blending?") {return "What happens when we join sounds together?";}
+    if (trimmed === "What does CVC mean?") {return "What three-sound pattern do these letters show?";}
+    if (trimmed === "What is a digraph?") {return "What is a sound team?";}
+    if (/^Which action helps blending/.test(trimmed)) {return "Which action helps us blend: slide, stop, or skip?";}
+    if (/^Which word is/.test(trimmed)) {return trimmed.replace(/^Which word is/, "What word do these sounds make:");}
+    if (/^What should you check when decoding/.test(trimmed)) {return "When you read a new word, what should you check?";}
+    if (/^Which word begins/.test(trimmed)) {return trimmed.replace(/^Which word begins/, "Listen: which word begins");}
+    if (/^How many sounds does/.test(trimmed)) {return "Do the two letters make one sound or two?";}
+    if (/^What happens to the final e/.test(trimmed)) {return "What does the quiet e do?";}
+    if (/^Which word has long/.test(trimmed)) {return trimmed.replace(/^Which word has long (.+)\?$/, "Which word has the long $1 sound?");}
+    if (/^What should you do after decoding/.test(trimmed)) {return "After you sound out a word, what should you do next?";}
+    if (/^What does ‘The dog can sit’ say/.test(trimmed)) {return "Read ‘The dog can sit.’ What can the dog do?";}
+    if (/^What is a good first step/.test(trimmed)) {return "When a word is new, what should you look for first?";}
+    if (/^Which patterns help/.test(trimmed)) {return trimmed.replace(/^Which patterns help/, "Which sound patterns help");}
+    if (/^Why read pretend words/.test(trimmed)) {return "Why do readers practice with pretend words?";}
+    if (/^Blend/.test(trimmed) || /^Read/.test(trimmed)) {return `Try it: ${lowerFirst(trimmed)}`;}
+    return trimmed;
+  }
+  if (grade === "4") {
+    if (/^What does the denominator in/.test(trimmed)) {return trimmed.replace(/^What does the denominator in (.+) tell us\?$/, "Look at $1. What does the bottom number tell you?");}
+    if (/^Which fraction means/.test(trimmed)) {return trimmed.replace(/^Which fraction means/, "Which fraction shows");}
+    if (/^What must parts of/.test(trimmed)) {return "For a fraction model, what must the parts be?";}
+    if (/^How many intervals/.test(trimmed)) {return trimmed.replace(/^How many intervals/, "How many equal spaces");}
+    if (/^Which point is/.test(trimmed)) {return trimmed.replace(/^Which point is/, "On the number line, which point is");}
+    if (/^Which fraction is equivalent/.test(trimmed)) {return trimmed.replace(/^Which fraction is equivalent to/, "Which fraction names the same amount as");}
+    if (/^What must happen to numerator and denominator/.test(trimmed)) {return "To keep the same amount, what must happen to the top and bottom numbers?";}
+    if (/^Is (.+) equal to (.+)\?$/.test(trimmed)) {const match = trimmed.match(/^Is (.+) equal to (.+)\?$/); return `Do ${match?.[1] ?? "these fractions"} and ${match?.[2] ?? "the other fraction"} name the same amount?`;}
+    if (/^What is the best proof that/.test(trimmed)) {return trimmed.replace(/^What is the best proof that/, "Which choice best proves that");}
+    if (/^What is/.test(trimmed) && /[0-9]/.test(trimmed)) {return trimmed.replace(/^What is (.+)\?$/, "Can you solve $1?");}
+    if (/^Why use/.test(trimmed)) {return trimmed.replace(/^Why use/, "Why do we use");}
+    if (/^What stays the same/.test(trimmed)) {return "When the denominators match, what stays the same?";}
+    if (/^Complete/.test(trimmed)) {return trimmed.replace(/^Complete/, "Fill in the comparison sign:");}
+    if (/^Why cannot/.test(trimmed)) {return "Why can’t we compare the bottom numbers alone?";}
+    if (/^What does the denominator name/.test(trimmed)) {return "What does the bottom number name?";}
+    if (/^What should be added first/.test(trimmed)) {return "When adding mixed numbers, what should you add first?";}
+    if (/^Why write the unit/.test(trimmed)) {return "Why should a measurement answer include a unit?";}
+    if (/^Which operation finds/.test(trimmed)) {return "Which operation finds what is left after some is used?";}
+    if (/^What should a math explanation include/.test(trimmed)) {return "What should you show so another mathematician can follow your thinking?";}
+    if (/^Why is/.test(trimmed)) {return trimmed.replace(/^Why is/, "How can you show why");}
+    return trimmed;
+  }
+  if (trimmed === "Which is abiotic?") {return "Which factor is nonliving?";}
+  if (trimmed === "Which is biotic?") {return "Which factor is living?";}
+  if (trimmed === "What does an ecosystem include?") {return "Which two kinds of parts work together in an ecosystem?";}
+  if (trimmed === "Which is a habitat?") {return "Which choice names a place where an organism lives?";}
+  if (trimmed === "Which best describes a niche?") {return "Which choice best describes an organism’s role?";}
+  if (trimmed === "Why can overlapping niches cause competition?") {return "Why might two organisms compete when they need the same resource?";}
+  if (trimmed === "Which is a producer?") {return "Which organism makes its own food?";}
+  if (trimmed === "What does grass → rabbit show?") {return "In grass → rabbit, what does the arrow tell us?";}
+  if (trimmed === "Where does most chain energy begin?") {return "Where does the energy in most food chains start?";}
+  if (trimmed === "Why use a food web?") {return "What can a food web help us predict?";}
+  if (trimmed === "If prey decreases, a predator may…") {return "If prey decreases, what might happen to a predator?";}
+  if (trimmed === "What should you trace to predict effects?") {return "Which connected arrows should you trace to predict effects?";}
+  if (trimmed === "Which has the most available energy?") {return "Which level of the food chain has the most available energy?";}
+  if (trimmed === "What flows rather than cycles?") {return "Which moves one way: energy or matter?";}
+  if (trimmed === "Which process returns matter from remains?") {return "Which process returns materials from dead remains to the environment?";}
+  if (trimmed === "Which is a matter reservoir?") {return "Which place can store matter in an ecosystem?";}
+  if (trimmed === "Which is a limiting factor?") {return "Which condition can limit a population’s growth?";}
+  if (trimmed === "What evidence should support a population claim?") {return "What pattern in the data would support a population claim?";}
+  if (trimmed === "What question helps classify an interaction?") {return "What should you ask about each species in an interaction?";}
+  if (trimmed === "What is resilience?") {return "After a disturbance, what does it mean for an ecosystem to recover?";}
+  if (trimmed === "Which evidence shows recovery?") {return "Which data pattern shows that the ecosystem is recovering?";}
+  if (trimmed === "Why model a disturbance?") {return "Why do scientists model a disturbance?";}
+  if (trimmed === "Which is evidence?") {return "Which choice is evidence from the data?";}
+  if (trimmed === "What connects evidence to a claim?") {return "What explains how evidence supports a claim?";}
+  if (trimmed === "Which explanation connects evidence and mechanism?") {return "Which explanation connects the data pattern to a system mechanism?";}
+  if (/^Which /.test(trimmed)) {return `Use the ecosystem model: ${lowerFirst(trimmed)}`;}
+  if (/^What /.test(trimmed)) {return `Use the ecosystem model: ${lowerFirst(trimmed)}`;}
+  if (/^Why /.test(trimmed)) {return `Use the ecosystem model: ${lowerFirst(trimmed)}`;}
+  return trimmed;
+}
+
 const originalSource = { kind: "ORIGINAL" as const, attribution: "StudySmart Originals", license: "StudySmart Original · educator-reviewed pilot", reviewedBy: "StudySmart Curriculum Review Board" };
 
 function practiceItems(prefix: string, items: LessonSpec["guided"]): PracticeItem[] {
@@ -52,7 +150,7 @@ function makeLesson(unitId: string, grade: LibraryGrade, subject: LibrarySubject
     const raw = [question.answer, ...question.distractors].slice(0, 4);
     const answerIndex = (sequence + index) % raw.length;
     const options = raw.map((_, optionIndex) => raw[(optionIndex - answerIndex + raw.length) % raw.length]);
-    return { id: `${unitId}-l${sequence}-q${index + 1}`, prompt: question.prompt, options, answerIndex, explanation: question.explanation, conceptId, difficulty: question.difficulty ?? (index === 0 ? "RECALL" : index === 1 ? "APPLY" : "TRANSFER") };
+    return { id: `${unitId}-l${sequence}-q${index + 1}`, prompt: ageFriendlyPrompt(grade, question.prompt), options, answerIndex, explanation: question.explanation, conceptId, difficulty: question.difficulty ?? (index === 0 ? "RECALL" : index === 1 ? "APPLY" : "TRANSFER") };
   });
   return {
     id: `${unitId}-lesson-${sequence}`,
